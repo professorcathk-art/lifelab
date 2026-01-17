@@ -1,0 +1,8 @@
+import Foundation
+
+// Copy this file to APIConfig.swift and add your API key
+struct APIConfig {
+    static let aimlAPIKey = "YOUR_API_KEY_HERE"
+    static let aimlAPIURL = "https://api.aimlapi.com/v1/chat/completions"
+    static let model = "anthropic/claude-sonnet-4.5"
+}
