@@ -6,6 +6,13 @@
 
 天職 = 熱情（喜歡） × 價值（價值觀） × 天賦（優勢）
 
+## 🚀 Future Features
+
+See [FUTURE_FEATURES.md](./FUTURE_FEATURES.md) for planned features:
+- 🔐 Authentication & User Management
+- 💳 Subscription & Payment Processing
+- 📊 Cloud Data Sync
+
 ## 專案結構
 
 ```
