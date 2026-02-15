@@ -3,90 +3,297 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LifeLab - 支援與協助</title>
+    <meta name="description" content="LifeLab 支援與協助 - 常見問題、功能說明與聯絡方式">
+    <title>支援與協助 - LifeLab</title>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --primary-color: #2563eb;
+            --primary-dark: #1e40af;
+            --text-primary: #0f172a;
+            --text-secondary: #64748b;
+            --bg-white: #ffffff;
+            --bg-gray: #f8fafc;
+            --border-color: #e2e8f0;
+        }
+        
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Helvetica Neue', Arial, sans-serif;
             line-height: 1.6;
+            color: var(--text-primary);
+            background: var(--bg-white);
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        /* Header */
+        header {
+            background: var(--bg-white);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1.5rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.9);
+        }
+        
+        .header-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #2563eb, #7c3aed);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-decoration: none;
+        }
+        
+        /* Main Content */
+        .container {
             max-width: 800px;
             margin: 0 auto;
-            padding: 20px;
-            color: #333;
+            padding: 4rem 2rem;
         }
+        
         h1 {
-            color: #007AFF;
-            border-bottom: 3px solid #007AFF;
-            padding-bottom: 10px;
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
         }
+        
         h2 {
-            color: #007AFF;
-            margin-top: 30px;
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-top: 3rem;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--border-color);
         }
+        
         h3 {
-            color: #555;
-            margin-top: 20px;
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-top: 2rem;
+            margin-bottom: 0.75rem;
+            color: var(--text-primary);
         }
+        
+        p {
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+            line-height: 1.7;
+        }
+        
         ul {
-            margin: 10px 0;
-            padding-left: 20px;
+            margin: 1rem 0;
+            padding-left: 1.5rem;
+            color: var(--text-secondary);
         }
-        .contact {
-            background-color: #f5f5f5;
-            padding: 20px;
-            border-radius: 8px;
-            margin-top: 30px;
+        
+        li {
+            margin-bottom: 0.5rem;
+            line-height: 1.6;
+        }
+        
+        .contact-box {
+            background: var(--bg-gray);
+            padding: 2rem;
+            border-radius: 12px;
+            margin-top: 3rem;
+            border: 1px solid var(--border-color);
+        }
+        
+        .contact-box h3 {
+            margin-top: 0;
+            color: var(--primary-color);
+        }
+        
+        /* Footer */
+        footer {
+            background: var(--text-primary);
+            color: white;
+            padding: 3rem 2rem 2rem;
+            margin-top: 4rem;
+        }
+        
+        .footer-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .footer-content {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .footer-section h4 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            opacity: 0.9;
+        }
+        
+        .footer-section ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .footer-section ul li {
+            margin-bottom: 0.5rem;
+        }
+        
+        .footer-section a {
+            color: rgba(255, 255, 255, 0.7);
+            text-decoration: none;
+            transition: color 0.3s;
+            font-size: 0.95rem;
+        }
+        
+        .footer-section a:hover {
+            color: white;
+        }
+        
+        .footer-bottom {
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding-top: 2rem;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.9rem;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 2rem 1.5rem;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
         }
     </style>
 </head>
 <body>
-    <h1>LifeLab - 支援與協助</h1>
+    <!-- Header -->
+    <header>
+        <div class="header-container">
+            <a href="/" class="logo">LifeLab</a>
+        </div>
+    </header>
     
-    <h2>常見問題</h2>
-    
-    <h3>如何開始使用 LifeLab？</h3>
-    <p>下載應用後，請完成個人資料問卷（基本資訊、興趣、優勢、價值觀），AI 將為您生成專屬的生命藍圖。</p>
-    
-    <h3>如何修改生命藍圖？</h3>
-    <p>在個人檔案頁面，點擊「編輯生命藍圖」即可修改或重新生成。您可以調整優先順序、標記最愛方向，或生成新版本。</p>
-    
-    <h3>如何生成行動計劃？</h3>
-    <p>完成深化探索並生成第二版生命藍圖後，選擇一個方向作為「當前行動方向」，即可生成專屬的行動計劃。</p>
-    
-    <h3>如何修改每日任務？</h3>
-    <p>在任務管理頁面，您可以查看、修改或新增每日任務。任務會根據您的短期和中期目標自動生成。</p>
-    
-    <h3>資料會儲存在哪裡？</h3>
-    <p>您的資料會安全地儲存在我們的伺服器上，並在您的設備上進行本地快取，確保快速載入和離線使用。</p>
-    
-    <h3>如何刪除帳號或資料？</h3>
-    <p>請透過應用內的「設定」→「清除所有資料」功能，或透過意見反饋功能聯繫我們協助處理。</p>
-    
-    <h2>功能說明</h2>
-    
-    <h3>生命藍圖</h3>
-    <p>AI 根據您的個人資料生成 3 個量身打造的職涯方向，每個方向都包含詳細的市場可行性分析與發展建議。</p>
-    
-    <h3>深化探索</h3>
-    <p>持續優化您的生命藍圖，透過更深入的探索與分析，找到最適合您的職涯路徑。每次生成新版本需要間隔 1 小時。</p>
-    
-    <h3>行動計劃</h3>
-    <p>將抽象的職涯目標轉化為具體的行動計劃，包含短期、中期與長期目標，以及關鍵里程碑。</p>
-    
-    <h3>任務管理</h3>
-    <p>每日任務提醒與追蹤，幫助您逐步實現職涯目標。任務會根據您的目標自動生成，您也可以手動新增或修改。</p>
-    
-    <div class="contact">
-        <h2>聯絡我們</h2>
-        <p>如有任何問題或建議，歡迎透過以下方式聯繫我們：</p>
+    <!-- Main Content -->
+    <div class="container">
+        <h1>支援與協助</h1>
+        
+        <h2>常見問題</h2>
+        
+        <h3>如何開始使用 LifeLab？</h3>
+        <p>下載應用後，請完成個人資料問卷（基本資訊、興趣、優勢、價值觀），AI 將為您生成專屬的生命藍圖。</p>
+        
+        <h3>如何修改生命藍圖？</h3>
+        <p>在個人檔案頁面，點擊「編輯生命藍圖」即可修改或重新生成。您可以調整優先順序、標記最愛方向，或生成新版本。</p>
+        
+        <h3>如何生成行動計劃？</h3>
+        <p>在「深化探索」頁面，完成第二版生命藍圖後，選擇一個方向作為「當前行動方向」，然後點擊「生成行動計劃」。</p>
+        
+        <h3>生命藍圖多久可以重新生成？</h3>
+        <p>為了確保 AI 分析的品質，每次生成生命藍圖後需要等待 1 小時才能再次生成。</p>
+        
+        <h3>如何管理每日任務？</h3>
+        <p>在「任務管理」頁面，您可以查看 AI 生成的今日任務，也可以手動新增、修改或刪除任務。</p>
+        
+        <h2>功能說明</h2>
+        
+        <h3>初步掃描</h3>
+        <p>完成個人資料問卷，包括：</p>
         <ul>
-            <li>應用內「設定」→「意見反饋」功能</li>
-            <li>電子郵件：support@lifelab.app</li>
+            <li>基本資訊（地區、年齡、職業等）</li>
+            <li>興趣選擇（關鍵字選擇）</li>
+            <li>優勢問卷（5 個問題）</li>
+            <li>價值觀排序（10 個核心價值觀）</li>
         </ul>
-        <p>我們會盡快回覆您的問題。</p>
+        
+        <h3>AI 分析</h3>
+        <p>AI 會根據您的回答，生成：</p>
+        <ul>
+            <li>關鍵特質總結</li>
+            <li>初版生命藍圖（3 個職涯方向）</li>
+        </ul>
+        
+        <h3>深化探索</h3>
+        <p>透過更深入的探索，優化您的生命藍圖：</p>
+        <ul>
+            <li>心流日記（3 天記錄）</li>
+            <li>價值觀問題</li>
+            <li>資源盤點</li>
+            <li>後天強項分析</li>
+            <li>可行性評估</li>
+        </ul>
+        
+        <h3>行動計劃</h3>
+        <p>將職涯目標轉化為具體行動：</p>
+        <ul>
+            <li>短期目標（1-3 個月）</li>
+            <li>中期目標（3-12 個月）</li>
+            <li>長期目標（1-3 年）</li>
+            <li>關鍵里程碑</li>
+            <li>每日任務</li>
+        </ul>
+        
+        <div class="contact-box">
+            <h3>聯絡我們</h3>
+            <p>如有任何問題或建議，歡迎透過應用內的「意見反饋」功能與我們聯繫。</p>
+            <p>我們會盡快回覆您的問題。</p>
+        </div>
     </div>
     
-    <p style="margin-top: 40px; color: #999; font-size: 14px;">
-        最後更新：2024年2月
-    </p>
+    <!-- Footer -->
+    <footer>
+        <div class="footer-container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>LifeLab</h4>
+                    <p style="color: rgba(255, 255, 255, 0.7); font-size: 0.95rem; line-height: 1.6;">
+                        AI 驅動的個人化職涯規劃工具，為您量身打造專屬的生命藍圖。
+                    </p>
+                </div>
+                
+                <div class="footer-section">
+                    <h4>連結</h4>
+                    <ul>
+                        <li><a href="/support.html">支援與協助</a></li>
+                        <li><a href="/privacy.html">隱私政策</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer-section">
+                    <h4>功能</h4>
+                    <ul>
+                        <li><a href="/">首頁</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="footer-bottom">
+                <p>&copy; 2024 LifeLab. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
 </body>
 </html>

@@ -3,44 +3,195 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LifeLab - 隱私政策</title>
+    <meta name="description" content="LifeLab 隱私政策 - 了解我們如何保護您的個人資料">
+    <title>隱私政策 - LifeLab</title>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --primary-color: #2563eb;
+            --primary-dark: #1e40af;
+            --text-primary: #0f172a;
+            --text-secondary: #64748b;
+            --bg-white: #ffffff;
+            --bg-gray: #f8fafc;
+            --border-color: #e2e8f0;
+        }
+        
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Helvetica Neue', Arial, sans-serif;
             line-height: 1.6;
+            color: var(--text-primary);
+            background: var(--bg-white);
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        /* Header */
+        header {
+            background: var(--bg-white);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1.5rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.9);
+        }
+        
+        .header-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #2563eb, #7c3aed);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-decoration: none;
+        }
+        
+        /* Main Content */
+        .container {
             max-width: 800px;
             margin: 0 auto;
-            padding: 20px;
-            color: #333;
+            padding: 4rem 2rem;
         }
-        h1 {
-            color: #007AFF;
-            border-bottom: 3px solid #007AFF;
-            padding-bottom: 10px;
-        }
-        h2 {
-            color: #007AFF;
-            margin-top: 30px;
-        }
-        ul {
-            margin: 10px 0;
-            padding-left: 20px;
-        }
+        
         .update-date {
-            color: #999;
-            font-size: 14px;
-            margin-bottom: 30px;
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            margin-bottom: 2rem;
         }
-        .section {
-            margin-bottom: 30px;
+        
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+        
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-top: 3rem;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--border-color);
+        }
+        
+        p {
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+            line-height: 1.7;
+        }
+        
+        ul {
+            margin: 1rem 0;
+            padding-left: 1.5rem;
+            color: var(--text-secondary);
+        }
+        
+        li {
+            margin-bottom: 0.5rem;
+            line-height: 1.6;
+        }
+        
+        strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+        
+        /* Footer */
+        footer {
+            background: var(--text-primary);
+            color: white;
+            padding: 3rem 2rem 2rem;
+            margin-top: 4rem;
+        }
+        
+        .footer-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .footer-content {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .footer-section h4 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            opacity: 0.9;
+        }
+        
+        .footer-section ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .footer-section ul li {
+            margin-bottom: 0.5rem;
+        }
+        
+        .footer-section a {
+            color: rgba(255, 255, 255, 0.7);
+            text-decoration: none;
+            transition: color 0.3s;
+            font-size: 0.95rem;
+        }
+        
+        .footer-section a:hover {
+            color: white;
+        }
+        
+        .footer-bottom {
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding-top: 2rem;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.9rem;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 2rem 1.5rem;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
         }
     </style>
 </head>
 <body>
-    <h1>LifeLab 隱私政策</h1>
-    <p class="update-date">最後更新日期：2024年2月</p>
+    <!-- Header -->
+    <header>
+        <div class="header-container">
+            <a href="/" class="logo">LifeLab</a>
+        </div>
+    </header>
     
-    <div class="section">
+    <!-- Main Content -->
+    <div class="container">
+        <h1>LifeLab 隱私政策</h1>
+        <p class="update-date">最後更新日期：2024年2月</p>
+        
         <h2>1. 資料收集</h2>
         <p>我們收集以下資料以提供 LifeLab 服務：</p>
         <ul>
@@ -48,102 +199,105 @@
             <li><strong>興趣與優勢</strong>：您選擇的興趣關鍵字、優勢問卷回答</li>
             <li><strong>價值觀</strong>：核心價值觀排序與問卷回答</li>
             <li><strong>生命藍圖資料</strong>：AI 生成的職涯方向、行動計劃、任務資料</li>
-            <li><strong>應用使用情況</strong>：功能使用記錄、錯誤日誌（用於改進服務）</li>
+            <li><strong>使用資料</strong>：應用使用情況、功能使用記錄</li>
         </ul>
-    </div>
-    
-    <div class="section">
+        
         <h2>2. 資料使用</h2>
-        <p>我們使用收集的資料用於以下目的：</p>
+        <p>我們使用收集的資料用於：</p>
         <ul>
-            <li>生成您的專屬生命藍圖與職涯建議</li>
-            <li>提供個人化的行動計劃與任務建議</li>
-            <li>改進我們的 AI 模型與服務品質</li>
-            <li>與您溝通（如需要）</li>
-            <li>確保應用正常運作與安全性</li>
+            <li>生成您的個人化生命藍圖與職涯建議</li>
+            <li>提供 AI 分析與建議服務</li>
+            <li>改進應用功能與使用者體驗</li>
+            <li>提供客戶支援服務</li>
         </ul>
-    </div>
-    
-    <div class="section">
-        <h2>3. 資料儲存與安全</h2>
-        <p>我們採用以下措施保護您的資料安全：</p>
+        
+        <h2>3. 資料儲存</h2>
+        <p>您的資料儲存在：</p>
         <ul>
-            <li><strong>加密傳輸</strong>：所有資料傳輸均使用 HTTPS 加密</li>
-            <li><strong>安全儲存</strong>：資料儲存在 Supabase 安全伺服器上，採用業界標準加密技術</li>
-            <li><strong>本地快取</strong>：資料會在您的設備上進行本地快取，確保快速載入和離線使用</li>
-            <li><strong>存取控制</strong>：只有您本人可以存取您的個人資料</li>
+            <li><strong>本地儲存</strong>：應用內本地儲存，用於快速載入</li>
+            <li><strong>雲端儲存</strong>：Supabase 雲端資料庫，用於資料同步與備份</li>
+            <li><strong>加密</strong>：所有資料傳輸與儲存均經過加密處理</li>
         </ul>
-        <p>我們使用 Supabase 作為資料庫服務提供商，他們遵循嚴格的資料安全標準。</p>
-    </div>
-    
-    <div class="section">
+        
         <h2>4. 資料分享</h2>
-        <p>我們重視您的隱私，不會將您的個人資料出售或分享給第三方，除非：</p>
+        <p>我們不會將您的個人資料出售、交易或分享給第三方，除非：</p>
         <ul>
+            <li>您明確同意分享</li>
             <li>法律要求或法院命令</li>
-            <li>保護我們的權利、財產或安全</li>
-            <li>經您明確同意</li>
-            <li>與服務提供商分享（如 Supabase），但僅限於提供服務所需</li>
+            <li>保護我們的權利與財產</li>
         </ul>
-        <p>我們不會將您的資料用於廣告或行銷目的。</p>
-    </div>
-    
-    <div class="section">
-        <h2>5. 您的權利</h2>
-        <p>您對您的個人資料擁有以下權利：</p>
+        
+        <h2>5. 使用者權利</h2>
+        <p>您有權：</p>
         <ul>
-            <li><strong>查看權</strong>：隨時查看您的個人資料</li>
-            <li><strong>修改權</strong>：修改或更新您的資料</li>
-            <li><strong>刪除權</strong>：刪除您的帳號和所有資料</li>
-            <li><strong>導出權</strong>：導出您的所有資料</li>
-            <li><strong>撤回同意</strong>：隨時撤回資料處理同意</li>
+            <li>查看您的個人資料</li>
+            <li>編輯或更新您的資料</li>
+            <li>刪除您的帳號與資料</li>
+            <li>匯出您的資料</li>
+            <li>撤回同意</li>
         </ul>
-        <p>您可以透過應用內的「設定」→「導出所有資料」或「清除所有資料」功能行使這些權利。</p>
-    </div>
-    
-    <div class="section">
+        
         <h2>6. 第三方服務</h2>
         <p>我們使用以下第三方服務：</p>
         <ul>
-            <li><strong>Supabase</strong>：用於資料儲存與用戶認證</li>
-            <li><strong>AI 服務</strong>：用於生成生命藍圖與建議（資料經過匿名化處理）</li>
-            <li><strong>Apple Sign In</strong>：用於 Apple 帳號登入</li>
+            <li><strong>Supabase</strong>：用於資料儲存與認證服務</li>
+            <li><strong>AI API</strong>：用於生成生命藍圖與分析</li>
+            <li><strong>Apple App Store</strong>：用於應用分發與支付處理</li>
         </ul>
-        <p>這些服務提供商都有各自的隱私政策，我們建議您查看他們的隱私政策。</p>
-    </div>
-    
-    <div class="section">
+        <p>這些服務可能有自己的隱私政策，我們建議您查看相關政策。</p>
+        
         <h2>7. 資料保留</h2>
-        <p>我們會保留您的資料，直到您要求刪除或帳號被刪除。刪除帳號後，我們會在合理時間內刪除您的所有個人資料。</p>
-    </div>
-    
-    <div class="section">
-        <h2>8. 兒童隱私</h2>
-        <p>LifeLab 不適合 13 歲以下兒童使用。我們不會故意收集 13 歲以下兒童的個人資料。如果我們發現收集了兒童資料，我們會立即刪除。</p>
-    </div>
-    
-    <div class="section">
-        <h2>9. 國際資料傳輸</h2>
-        <p>您的資料可能會被傳輸到並儲存在您所在國家/地區以外的伺服器上。我們會確保這些傳輸符合適用的資料保護法律。</p>
-    </div>
-    
-    <div class="section">
-        <h2>10. 政策變更</h2>
-        <p>我們可能會不時更新本隱私政策。重大變更將透過應用通知您，並在政策頂部標註更新日期。繼續使用應用即表示您接受更新後的政策。</p>
-    </div>
-    
-    <div class="section">
-        <h2>11. 聯絡我們</h2>
-        <p>如有任何關於本隱私政策的問題、意見或請求，請透過以下方式聯繫我們：</p>
+        <p>我們會保留您的資料，直到：</p>
         <ul>
-            <li>應用內「設定」→「意見反饋」功能</li>
-            <li>電子郵件：privacy@lifelab.app</li>
+            <li>您要求刪除帳號</li>
+            <li>資料不再需要提供服務</li>
+            <li>法律要求的保留期限屆滿</li>
         </ul>
-        <p>我們會盡快回覆您的問題。</p>
+        
+        <h2>8. 兒童隱私</h2>
+        <p>LifeLab 不針對 13 歲以下的兒童。我們不會故意收集兒童的個人資料。如果您發現我們收集了兒童的資料，請立即聯繫我們。</p>
+        
+        <h2>9. 國際資料傳輸</h2>
+        <p>您的資料可能會傳輸到並儲存在您所在國家/地區以外的伺服器。我們會確保資料傳輸符合適用的資料保護法律。</p>
+        
+        <h2>10. 政策變更</h2>
+        <p>我們可能會不時更新本隱私政策。重大變更會透過應用內通知或電子郵件告知您。繼續使用應用即表示您接受更新後的政策。</p>
+        
+        <h2>11. 聯絡我們</h2>
+        <p>如有任何關於隱私政策的問題，請透過應用內的「意見反饋」功能與我們聯繫。</p>
     </div>
     
-    <p style="margin-top: 40px; color: #999; font-size: 14px;">
-        本隱私政策適用於 LifeLab 應用及其所有功能與服務。
-    </p>
+    <!-- Footer -->
+    <footer>
+        <div class="footer-container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>LifeLab</h4>
+                    <p style="color: rgba(255, 255, 255, 0.7); font-size: 0.95rem; line-height: 1.6;">
+                        AI 驅動的個人化職涯規劃工具，為您量身打造專屬的生命藍圖。
+                    </p>
+                </div>
+                
+                <div class="footer-section">
+                    <h4>連結</h4>
+                    <ul>
+                        <li><a href="/support.html">支援與協助</a></li>
+                        <li><a href="/privacy.html">隱私政策</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer-section">
+                    <h4>功能</h4>
+                    <ul>
+                        <li><a href="/">首頁</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="footer-bottom">
+                <p>&copy; 2024 LifeLab. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
 </body>
 </html>
