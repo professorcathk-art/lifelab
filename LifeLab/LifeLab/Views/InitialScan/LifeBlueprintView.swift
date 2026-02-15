@@ -7,37 +7,67 @@ struct LifeBlueprintView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
-                VStack(spacing: 12) {
+                VStack(spacing: BrandSpacing.md) {
                     Text("初版生命藍圖")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
+                        .font(BrandTypography.largeTitle)
+                        .foregroundColor(BrandColors.primaryText)
                     
                     Text("基於您的輸入，AI為您生成的個人化方向建議")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .font(BrandTypography.subheadline)
+                        .foregroundColor(BrandColors.secondaryText)
                         .multilineTextAlignment(.center)
                 }
-                .padding(.top, 32)
+                .padding(.top, BrandSpacing.xxxl)
                 
                 if viewModel.isLoadingBlueprint {
-                    VStack(spacing: 16) {
+                    VStack(spacing: BrandSpacing.lg) {
                         ProgressView()
                             .scaleEffect(1.5)
+                            .tint(BrandColors.primaryBlue)
                         Text("正在生成生命藍圖...")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+                            .font(BrandTypography.subheadline)
+                            .foregroundColor(BrandColors.secondaryText)
                         Text("這可能需要幾秒鐘時間")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                            .font(BrandTypography.caption)
+                            .foregroundColor(BrandColors.tertiaryText)
+                        
+                        // Add retry button if loading takes too long
+                        Button(action: {
+                            // Force stop loading and use fallback
+                            viewModel.isLoadingBlueprint = false
+                            viewModel.generateLifeBlueprint()
+                        }) {
+                            Text("如果等待時間過長，點擊重試")
+                                .font(BrandTypography.caption)
+                                .foregroundColor(BrandColors.primaryBlue)
+                                .padding(.top, BrandSpacing.md)
+                        }
+                        .buttonStyle(.plain)
                     }
                     .padding(.vertical, 60)
                 } else if let blueprint = viewModel.lifeBlueprint {
-                    VStack(spacing: 20) {
+                    VStack(spacing: BrandSpacing.xl) {
+                        // Version indicator
+                        HStack {
+                            Text("Version \(blueprint.version)")
+                                .font(BrandTypography.caption)
+                                .foregroundColor(BrandColors.secondaryText)
+                            Spacer()
+                            Text(blueprint.createdAt.formatted(date: .abbreviated, time: .omitted))
+                                .font(BrandTypography.caption)
+                                .foregroundColor(BrandColors.secondaryText)
+                        }
+                        .padding(.horizontal, BrandSpacing.xl)
+                        
                         if !blueprint.vocationDirections.isEmpty {
-                            VStack(alignment: .leading, spacing: 16) {
-                                Text("基礎天職猜測")
-                                    .font(.title2)
-                                    .fontWeight(.semibold)
+                            VStack(alignment: .leading, spacing: BrandSpacing.lg) {
+                                HStack {
+                                    Image(systemName: "sparkles")
+                                        .foregroundColor(BrandColors.primaryBlue)
+                                    Text("基礎天職猜測")
+                                        .font(BrandTypography.title2)
+                                        .foregroundColor(BrandColors.primaryText)
+                                }
                                 
                                 ForEach(blueprint.vocationDirections) { direction in
                                     VocationDirectionCard(direction: direction)
@@ -46,38 +76,42 @@ struct LifeBlueprintView: View {
                         }
                         
                         if !blueprint.strengthsSummary.isEmpty {
-                            VStack(alignment: .leading, spacing: 12) {
+                            VStack(alignment: .leading, spacing: BrandSpacing.md) {
                                 Text("優勢總結")
-                                    .font(.title2)
-                                    .fontWeight(.semibold)
+                                    .font(BrandTypography.title2)
+                                    .foregroundColor(BrandColors.primaryText)
                                 
                                 Text(blueprint.strengthsSummary)
-                                    .font(.body)
+                                    .font(BrandTypography.body)
+                                    .foregroundColor(BrandColors.primaryText)
                                     .lineSpacing(8)
                             }
-                            .padding()
+                            .padding(BrandSpacing.lg)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color(.systemGray6))
-                            .cornerRadius(12)
+                            .background(BrandColors.secondaryBackground)
+                            .cornerRadius(BrandRadius.medium)
+                            .shadow(color: BrandShadow.medium.color, radius: BrandShadow.medium.radius, x: BrandShadow.medium.x, y: BrandShadow.medium.y)
                         }
                         
                         if !blueprint.feasibilityAssessment.isEmpty {
-                            VStack(alignment: .leading, spacing: 12) {
+                            VStack(alignment: .leading, spacing: BrandSpacing.md) {
                                 Text("可行性初評")
-                                    .font(.title2)
-                                    .fontWeight(.semibold)
+                                    .font(BrandTypography.title2)
+                                    .foregroundColor(BrandColors.primaryText)
                                 
                                 Text(blueprint.feasibilityAssessment)
-                                    .font(.body)
+                                    .font(BrandTypography.body)
+                                    .foregroundColor(BrandColors.primaryText)
                                     .lineSpacing(8)
                             }
-                            .padding()
+                            .padding(BrandSpacing.lg)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color(.systemGray6))
-                            .cornerRadius(12)
+                            .background(BrandColors.secondaryBackground)
+                            .cornerRadius(BrandRadius.medium)
+                            .shadow(color: BrandShadow.medium.color, radius: BrandShadow.medium.radius, x: BrandShadow.medium.x, y: BrandShadow.medium.y)
                         }
                     }
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, BrandSpacing.xl)
                     
                     // Share/Export buttons
                     HStack(spacing: BrandSpacing.md) {
@@ -96,10 +130,10 @@ struct LifeBlueprintView: View {
                         }) {
                             Label("導出", systemImage: "doc.badge.plus")
                                 .font(BrandTypography.headline)
-                                .foregroundColor(BrandColors.success)
+                                .foregroundColor(Color(hex: "10b6cc"))
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, BrandSpacing.lg)
-                                .background(BrandColors.success.opacity(0.1))
+                                .background(Color(hex: "10b6cc").opacity(0.1))
                                 .cornerRadius(BrandRadius.medium)
                         }
                     }
@@ -167,27 +201,33 @@ struct VocationDirectionCard: View {
     let direction: VocationDirection
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: BrandSpacing.md) {
             Text(direction.title)
-                .font(.headline)
+                .font(BrandTypography.headline)
+                .foregroundColor(BrandColors.primaryText)
             
             Text(direction.description)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .lineSpacing(4)
+                .font(BrandTypography.subheadline)
+                .foregroundColor(BrandColors.secondaryText)
+                .lineSpacing(6)
             
-            HStack {
+            HStack(spacing: BrandSpacing.xs) {
                 Image(systemName: "chart.line.uptrend.xyaxis")
-                    .font(.caption)
+                    .font(BrandTypography.caption)
                 Text(direction.marketFeasibility)
-                    .font(.caption)
+                    .font(BrandTypography.caption)
             }
-            .foregroundColor(.blue)
+            .foregroundColor(BrandColors.primaryBlue)
         }
-        .padding()
+        .padding(BrandSpacing.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.systemGray6))
-        .cornerRadius(12)
+        .background(BrandColors.secondaryBackground)
+        .cornerRadius(BrandRadius.medium)
+        .overlay(
+            RoundedRectangle(cornerRadius: BrandRadius.medium)
+                .stroke(Color(hex: "E5E7EB"), lineWidth: 1)
+        )
+        .shadow(color: BrandShadow.small.color, radius: BrandShadow.small.radius, x: BrandShadow.small.x, y: BrandShadow.small.y)
     }
 }
 

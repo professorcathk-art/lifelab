@@ -30,29 +30,17 @@ struct ActionPlanReviewView: View {
                         
                         // Short Term
                         if !actionPlan.shortTerm.isEmpty {
-                            TaskSection(title: "短期目標（1-3個月）", items: actionPlan.shortTerm, isEditing: isEditing, onUpdate: { updatedItems in
-                                var updatedPlan = actionPlan
-                                updatedPlan.shortTerm = updatedItems
-                                viewModel.updateActionPlan(updatedPlan)
-                            })
+                            TaskSection(title: "短期目標（1-3個月）", items: actionPlan.shortTerm, sectionType: .shortTerm)
                         }
                         
                         // Mid Term
                         if !actionPlan.midTerm.isEmpty {
-                            TaskSection(title: "中期目標（3-6個月）", items: actionPlan.midTerm, isEditing: isEditing, onUpdate: { updatedItems in
-                                var updatedPlan = actionPlan
-                                updatedPlan.midTerm = updatedItems
-                                viewModel.updateActionPlan(updatedPlan)
-                            })
+                            TaskSection(title: "中期目標（3-6個月）", items: actionPlan.midTerm, sectionType: .midTerm)
                         }
                         
                         // Long Term
                         if !actionPlan.longTerm.isEmpty {
-                            TaskSection(title: "長期目標（6-12個月）", items: actionPlan.longTerm, isEditing: isEditing, onUpdate: { updatedItems in
-                                var updatedPlan = actionPlan
-                                updatedPlan.longTerm = updatedItems
-                                viewModel.updateActionPlan(updatedPlan)
-                            })
+                            TaskSection(title: "長期目標（6-12個月）", items: actionPlan.longTerm, sectionType: .longTerm)
                         }
                         
                         // Milestones
@@ -108,7 +96,7 @@ struct ActionPlanReviewView: View {
     }
 }
 
-struct EditableTaskCard: View {
+struct ActionPlanEditableTaskCard: View {
     @EnvironmentObject var dataService: DataService
     @Binding var item: ActionItem
     let isEditing: Bool
@@ -120,7 +108,7 @@ struct EditableTaskCard: View {
                     item.isCompleted.toggle()
                 }) {
                     Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
-                        .foregroundColor(item.isCompleted ? .green : .gray)
+                        .foregroundColor(item.isCompleted ? Color(hex: "10b6cc") : .gray)
                         .font(.title3)
                 }
                 .buttonStyle(PlainButtonStyle())

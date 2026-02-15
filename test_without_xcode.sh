@@ -105,7 +105,7 @@ run_app() {
     xcrun simctl install "$DEVICE_ID" "$APP_PATH"
     
     echo "▶️  Launching app..."
-    xcrun simctl launch "$DEVICE_ID" com.yourname.LifeLab || xcrun simctl launch "$DEVICE_ID" com.lifelab.LifeLab
+    xcrun simctl launch "$DEVICE_ID" com.resonance.lifelab
     
     echo "✅ App launched"
 }

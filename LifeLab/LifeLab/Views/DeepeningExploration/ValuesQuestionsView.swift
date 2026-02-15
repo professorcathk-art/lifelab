@@ -26,7 +26,7 @@ struct ValuesQuestionsView: View {
                     HStack(spacing: 8) {
                         ForEach(Array(0..<viewModel.totalQuestions), id: \.self) { index in
                             Circle()
-                                .fill(index < viewModel.answeredQuestions ? Color.green : Color.gray.opacity(0.3))
+                                .fill(index < viewModel.answeredQuestions ? Color(hex: "10b6cc") : Color.gray.opacity(0.3))
                                 .frame(width: 10, height: 10)
                         }
                     }
@@ -115,7 +115,7 @@ struct ValuesQuestionsView: View {
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
                                 .padding()
-                                .background(Color.green)
+                                .background(Color(hex: "10b6cc"))
                                 .cornerRadius(12)
                         }
                         .padding(.horizontal, 20)

@@ -52,6 +52,9 @@ struct StrengthsQuestionnaireView: View {
                             ), axis: .vertical)
                             .textFieldStyle(.roundedBorder)
                             .lineLimit(3...8)
+                            .autocorrectionDisabled(false)
+                            .textInputAutocapitalization(.sentences)
+                            .keyboardType(.default)
                             .padding(.top, 4)
                         }
                         
@@ -74,12 +77,34 @@ struct StrengthsQuestionnaireView: View {
                             Text("選擇最接近的關鍵詞：")
                                 .font(.headline)
                             
+                            // Show instruction for hierarchical selection
+                            if let response = currentResponse {
+                                let firstLevelKeywords = Array(question.keywordHierarchy.keys)
+                                let selectedFirstLevel = response.selectedKeywords.filter { firstLevelKeywords.contains($0) }
+                                
+                                if selectedFirstLevel.isEmpty {
+                                    Text("請先選擇第一層關鍵詞，我們會根據您的選擇顯示相關詞語")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                        .padding(.bottom, 8)
+                                } else {
+                                    Text("已選擇第一層關鍵詞，以下是相關的關鍵詞：")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                        .padding(.bottom, 8)
+                                }
+                            }
+                            
                             LazyVGrid(columns: [GridItem(.adaptive(minimum: 100))], spacing: 12) {
-                                ForEach(question.suggestedKeywords, id: \.self) { keyword in
+                                ForEach(viewModel.getAvailableKeywords(for: question.id), id: \.self) { keyword in
                                     let isSelected = currentResponse?.selectedKeywords.contains(keyword) ?? false
+                                    let firstLevelKeywords = Array(question.keywordHierarchy.keys)
+                                    let isFirstLevel = firstLevelKeywords.contains(keyword)
+                                    
                                     KeywordSelectionButton(
                                         keyword: keyword,
                                         isSelected: isSelected,
+                                        isFirstLevel: isFirstLevel,
                                         action: {
                                             if isSelected {
                                                 viewModel.removeStrengthKeyword(keyword, from: question.id)
@@ -110,7 +135,53 @@ struct StrengthsQuestionnaireView: View {
                     }
                     .padding(20)
                     
-                    // Navigation handled by progress dots - no buttons needed
+                    // Next button
+                    HStack(spacing: BrandSpacing.md) {
+                        if currentQuestionIndex > 0 {
+                            Button(action: {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                    currentQuestionIndex -= 1
+                                }
+                            }) {
+                                HStack(spacing: BrandSpacing.xs) {
+                                    Image(systemName: "arrow.left")
+                                    Text("上一題")
+                                }
+                                .font(BrandTypography.headline)
+                                .foregroundColor(BrandColors.primaryBlue)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, BrandSpacing.lg)
+                                .background(BrandColors.primaryBlue.opacity(0.1))
+                                .cornerRadius(BrandRadius.medium)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        
+                        Button(action: {
+                            if currentQuestionIndex < 4 {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                    currentQuestionIndex += 1
+                                }
+                            } else {
+                                viewModel.moveToNextStep()
+                            }
+                        }) {
+                            HStack(spacing: BrandSpacing.xs) {
+                                Text(currentQuestionIndex < 4 ? "下一題" : "完成")
+                                Image(systemName: "arrow.right")
+                            }
+                            .font(BrandTypography.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, BrandSpacing.lg)
+                            .background(BrandColors.primaryGradient)
+                            .cornerRadius(BrandRadius.medium)
+                            .shadow(color: BrandColors.primaryBlue.opacity(0.3), radius: 8, x: 0, y: 4)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.horizontal, BrandSpacing.xl)
+                    .padding(.bottom, BrandSpacing.xxxl)
                 }
             }
         }
@@ -120,21 +191,58 @@ struct StrengthsQuestionnaireView: View {
 struct KeywordSelectionButton: View {
     let keyword: String
     let isSelected: Bool
+    var isFirstLevel: Bool = false
     let action: () -> Void
+    
+    // Get a consistent color for each keyword based on its hash
+    private var keywordColor: Color {
+        let colors: [Color] = [
+            Color(hex: "10b6cc"), // Sky blue
+            Color(hex: "2B8A8F"), // Teal
+            Color(hex: "F5B861"), // Gold
+            Color(hex: "FF7B54"), // Coral
+            Color(hex: "E8B4FF"), // Purple
+            Color(hex: "FF6B6B"), // Pink
+            Color(hex: "4CAF50"), // Green
+            Color(hex: "00BCD4"), // Cyan
+            Color(hex: "8BC34A"), // Light green
+            Color(hex: "FFC107"), // Amber
+            Color(hex: "FF9800"), // Orange
+            Color(hex: "9C27B0"), // Deep purple
+        ]
+        let index = abs(keyword.hashValue) % colors.count
+        return colors[index]
+    }
     
     var body: some View {
         Button(action: action) {
-            Text(keyword)
-                .font(BrandTypography.subheadline)
-                .foregroundColor(isSelected ? .white : BrandColors.primaryText)
-                .padding(.horizontal, BrandSpacing.lg)
-                .padding(.vertical, BrandSpacing.md)
-                .background(isSelected ? BrandColors.primaryBlue : BrandColors.secondaryBackground)
-                .cornerRadius(BrandRadius.large)
-                .shadow(color: isSelected ? BrandColors.primaryBlue.opacity(0.3) : BrandShadow.small.color, 
-                       radius: isSelected ? 4 : BrandShadow.small.radius, 
-                       x: 0, 
-                       y: isSelected ? 2 : BrandShadow.small.y)
+            HStack(spacing: BrandSpacing.xs) {
+                Text(keyword)
+                    .font(BrandTypography.subheadline)
+                    .fontWeight(.medium)
+                
+                if isFirstLevel {
+                    Image(systemName: "star.fill")
+                        .font(.caption2)
+                }
+            }
+            .foregroundColor(isSelected ? .white : keywordColor)
+            .padding(.horizontal, BrandSpacing.lg)
+            .padding(.vertical, BrandSpacing.md)
+            .background(
+                isSelected 
+                    ? LinearGradient(colors: [keywordColor, keywordColor.opacity(0.8)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                    : LinearGradient(colors: [keywordColor.opacity(0.15), keywordColor.opacity(0.1)], startPoint: .topLeading, endPoint: .bottomTrailing)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: BrandRadius.large)
+                    .stroke(keywordColor.opacity(isSelected ? 0.5 : (isFirstLevel ? 0.5 : 0.3)), lineWidth: isSelected ? 2 : (isFirstLevel ? 1.5 : 1))
+            )
+            .cornerRadius(BrandRadius.large)
+            .shadow(color: keywordColor.opacity(isSelected ? 0.4 : (isFirstLevel ? 0.3 : 0.2)), 
+                   radius: isSelected ? 6 : (isFirstLevel ? 4 : 3), 
+                   x: 0, 
+                   y: isSelected ? 3 : (isFirstLevel ? 2 : 1))
         }
         .buttonStyle(.plain)
     }

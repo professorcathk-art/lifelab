@@ -3,8 +3,13 @@ import UIKit
 
 struct SettingsView: View {
     @EnvironmentObject var dataService: DataService
+    @EnvironmentObject var authService: AuthService
     @State private var showExportAlert = false
     @State private var showDeleteAlert = false
+    @State private var showFeedbackSheet = false
+    @State private var feedbackText = ""
+    @State private var isSubmittingFeedback = false
+    @State private var showFeedbackSuccess = false
     
     var body: some View {
         NavigationStack {
@@ -13,6 +18,10 @@ struct SettingsView: View {
                     if dataService.userProfile?.lifeBlueprint != nil {
                         NavigationLink(destination: ReviewInitialScanView()) {
                             Label("檢視初步掃描", systemImage: "eye.fill")
+                        }
+                        
+                        NavigationLink(destination: LifeBlueprintEditView(blueprint: dataService.userProfile!.lifeBlueprint!)) {
+                            Label("編輯生命藍圖", systemImage: "pencil")
                         }
                     }
                 }
@@ -40,8 +49,37 @@ struct SettingsView: View {
                             .foregroundColor(.secondary)
                     }
                     
-                    Link(destination: URL(string: "https://lifelab.app")!) {
-                        Label("網站", systemImage: "globe")
+                    Button(action: {
+                        showFeedbackSheet = true
+                    }) {
+                        Label("意見反饋", systemImage: "envelope")
+                    }
+                }
+                
+                Section("帳號") {
+                    if let user = authService.currentUser {
+                        HStack {
+                            Text("登錄方式")
+                            Spacer()
+                            Text(user.authProvider == .email ? "電子郵件" : "Apple")
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        if let email = user.email {
+                            HStack {
+                                Text("電子郵件")
+                                Spacer()
+                                Text(email)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        
+                        Button(action: {
+                            authService.signOut()
+                        }) {
+                            Label("登出", systemImage: "arrow.right.square")
+                                .foregroundColor(.red)
+                        }
                     }
                 }
             }
@@ -58,6 +96,21 @@ struct SettingsView: View {
                 }
             } message: {
                 Text("此操作無法復原，所有數據將被永久刪除")
+            }
+            .sheet(isPresented: $showFeedbackSheet) {
+                FeedbackView(
+                    feedbackText: $feedbackText,
+                    isSubmitting: $isSubmittingFeedback,
+                    showSuccess: $showFeedbackSuccess,
+                    onDismiss: { showFeedbackSheet = false }
+                )
+            }
+            .alert("反饋已提交", isPresented: $showFeedbackSuccess) {
+                Button("確定", role: .cancel) {
+                    feedbackText = ""
+                }
+            } message: {
+                Text("感謝您的反饋！我們會盡快處理。")
             }
         }
     }
@@ -149,17 +202,70 @@ struct SettingsView: View {
     }
     
     private func clearAllData() {
-        DataService.shared.updateUserProfile { profile in
-            profile.interests = []
-            profile.strengths = []
-            profile.values = []
-            profile.flowDiaryEntries = []
-            profile.valuesQuestions = nil
-            profile.resourceInventory = nil
-            profile.acquiredStrengths = nil
-            profile.feasibilityAssessment = nil
-            profile.lifeBlueprint = nil
-            profile.actionPlan = nil
+        DataService.shared.clearUserProfile()
+    }
+}
+
+struct FeedbackView: View {
+    @Binding var feedbackText: String
+    @Binding var isSubmitting: Bool
+    @Binding var showSuccess: Bool
+    let onDismiss: () -> Void
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextEditor(text: $feedbackText)
+                        .frame(minHeight: 200)
+                } header: {
+                    Text("請分享您的意見和建議")
+                } footer: {
+                    Text("您的反饋將發送至 professor.cat.hk@gmail.com")
+                }
+            }
+            .navigationTitle("意見反饋")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("取消") {
+                        feedbackText = ""
+                        dismiss()
+                        onDismiss()
+                    }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("提交") {
+                        submitFeedback()
+                    }
+                    .disabled(feedbackText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSubmitting)
+                }
+            }
+        }
+    }
+    
+    private func submitFeedback() {
+        guard !feedbackText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        
+        isSubmitting = true
+        
+        Task {
+            do {
+                try await FeedbackService.shared.submitFeedback(text: feedbackText)
+                await MainActor.run {
+                    isSubmitting = false
+                    showSuccess = true
+                    feedbackText = ""
+                    dismiss()
+                    onDismiss()
+                }
+            } catch {
+                await MainActor.run {
+                    isSubmitting = false
+                    print("Failed to submit feedback: \(error)")
+                }
+            }
         }
     }
 }

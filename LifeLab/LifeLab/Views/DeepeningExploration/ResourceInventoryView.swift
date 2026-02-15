@@ -39,7 +39,7 @@ struct ResourceInventoryView: View {
                         ResourceCategoryCard(
                             icon: "dollarsign.circle.fill",
                             title: "金錢資源",
-                            color: .green,
+                            color: Color(hex: "10b6cc"),
                             description: "您可以投入的資金預算",
                             text: Binding(
                                 get: { viewModel.inventory.money ?? "" },
@@ -86,7 +86,7 @@ struct ResourceInventoryView: View {
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
                                 .padding()
-                                .background(Color.green)
+                                .background(Color(hex: "10b6cc"))
                                 .cornerRadius(12)
                         }
                         .padding(.horizontal, 20)
@@ -136,7 +136,7 @@ struct ResourceCategoryCard: View {
                 
                 if !text.isEmpty {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
+                        .foregroundColor(Color(hex: "10b6cc"))
                 }
             }
             

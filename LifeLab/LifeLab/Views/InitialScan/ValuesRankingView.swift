@@ -3,6 +3,7 @@ import Combine
 
 struct ValuesRankingView: View {
     @EnvironmentObject var viewModel: InitialScanViewModel
+    @State private var refreshTrigger = UUID() // Force view refresh
     
     // Sort: greyed out at bottom, then by rank (higher rank = top)
     private var sortedValues: [ValueRanking] {
@@ -28,22 +29,35 @@ struct ValuesRankingView: View {
     }
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                VStack(spacing: 12) {
+        ZStack {
+            // Modern gradient background
+            LinearGradient(
+                colors: [
+                    Color(hex: "667eea").opacity(0.1),
+                    Color(hex: "764ba2").opacity(0.1),
+                    Color(hex: "f093fb").opacity(0.1)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+            
+            ScrollView {
+                VStack(spacing: BrandSpacing.xxl) {
+                VStack(spacing: BrandSpacing.md) {
                     Text("我的核心價值觀")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
+                        .font(BrandTypography.largeTitle)
+                        .foregroundColor(BrandColors.primaryText)
                     
                     Text("使用上下箭頭調整優先級，上方的價值觀優先級更高")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .font(BrandTypography.subheadline)
+                        .foregroundColor(BrandColors.secondaryText)
                         .multilineTextAlignment(.center)
-                        .padding(.horizontal, 32)
+                        .padding(.horizontal, BrandSpacing.xxxl)
                 }
-                .padding(.top, 32)
+                .padding(.top, BrandSpacing.xxxl)
                 
-                List {
+                VStack(spacing: BrandSpacing.md) {
                     ForEach(Array(sortedValues.enumerated()), id: \.element.id) { index, valueRanking in
                         ValueRankingCard(
                             valueRanking: valueRanking,
@@ -56,28 +70,15 @@ struct ValuesRankingView: View {
                                 moveValueDown(at: index)
                             }
                         )
-                        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .leading).combined(with: .opacity),
+                            removal: .move(edge: .trailing).combined(with: .opacity)
+                        ))
                     }
-                    .onMove { source, destination in
-                        // Handle drag to reorder
-                        let sortedIndices = sortedValues.map { $0.id }
-                        var reordered = sortedIndices
-                        reordered.move(fromOffsets: source, toOffset: destination)
-                        
-                        // Update ranks based on new order (top = rank 1, etc.)
-                        for (index, id) in reordered.enumerated() {
-                            if let valueIndex = viewModel.selectedValues.firstIndex(where: { $0.id == id }) {
-                                let newRank = index + 1
-                                viewModel.selectedValues[valueIndex].rank = newRank
-                                viewModel.selectedValues[valueIndex].isGreyedOut = false
-                            }
-                        }
-                        viewModel.objectWillChange.send()
-                    }
+                    // Removed .onMove to disable drag and drop - only arrow buttons allowed
                 }
-                .listStyle(.plain)
-                .frame(height: CGFloat(sortedValues.count * 150))
-                .padding(.horizontal, 20)
+                .padding(.horizontal, BrandSpacing.xl)
+                .id(refreshTrigger) // Force refresh when trigger changes
                 
                 Button(action: {
                     // Save final ranking based on position
@@ -85,18 +86,23 @@ struct ValuesRankingView: View {
                     viewModel.saveProgress()
                     viewModel.moveToNextStep()
                 }) {
-                    Text("完成")
-                        .font(BrandTypography.headline)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, BrandSpacing.lg)
-                        .background(BrandColors.primaryGradient)
-                        .cornerRadius(BrandRadius.medium)
-                        .shadow(color: BrandColors.primaryBlue.opacity(0.3), radius: 8, x: 0, y: 4)
+                    HStack(spacing: BrandSpacing.sm) {
+                        Text("完成")
+                            .font(.system(size: 18, weight: .semibold))
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 18, weight: .semibold))
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, BrandSpacing.lg)
+                    .background(BrandColors.primaryGradient)
+                    .cornerRadius(16)
+                    .shadow(color: BrandColors.primaryBlue.opacity(0.4), radius: 15, x: 0, y: 8)
                 }
                 .buttonStyle(.plain)
                 .padding(.horizontal, BrandSpacing.xl)
                 .padding(.bottom, BrandSpacing.xxxl)
+                }
             }
         }
     }
@@ -104,40 +110,85 @@ struct ValuesRankingView: View {
     private func moveValueUp(at index: Int) {
         guard index > 0 else { return }
         let values = sortedValues
+        guard !values[index].isGreyedOut && !values[index - 1].isGreyedOut else { return }
+        
         let currentId = values[index].id
         let targetId = values[index - 1].id
         
         if let currentIndex = viewModel.selectedValues.firstIndex(where: { $0.id == currentId }),
            let targetIndex = viewModel.selectedValues.firstIndex(where: { $0.id == targetId }) {
-            // Swap ranks to update position immediately
-            let currentRank = viewModel.selectedValues[currentIndex].rank
-            let targetRank = viewModel.selectedValues[targetIndex].rank
             
-            viewModel.selectedValues[currentIndex].rank = targetRank
-            viewModel.selectedValues[targetIndex].rank = currentRank
-            
-            // Force UI update
-            viewModel.objectWillChange.send()
+            // Actually swap the array positions (not just ranks)
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                viewModel.selectedValues.swapAt(currentIndex, targetIndex)
+                
+                // Update ranks based on new positions (top = rank 1)
+                let nonGreyedValues = viewModel.selectedValues.filter { !$0.isGreyedOut }
+                for (idx, value) in nonGreyedValues.enumerated() {
+                    if let valueIndex = viewModel.selectedValues.firstIndex(where: { $0.id == value.id }) {
+                        viewModel.selectedValues[valueIndex].rank = idx + 1
+                    }
+                }
+                
+                // Force view refresh
+                refreshTrigger = UUID()
+            }
         }
     }
     
     private func moveValueDown(at index: Int) {
         let values = sortedValues
         guard index < values.count - 1 else { return }
+        guard !values[index].isGreyedOut && !values[index + 1].isGreyedOut else { return }
+        
         let currentId = values[index].id
         let targetId = values[index + 1].id
         
         if let currentIndex = viewModel.selectedValues.firstIndex(where: { $0.id == currentId }),
            let targetIndex = viewModel.selectedValues.firstIndex(where: { $0.id == targetId }) {
-            // Swap ranks to update position immediately
-            let currentRank = viewModel.selectedValues[currentIndex].rank
-            let targetRank = viewModel.selectedValues[targetIndex].rank
             
-            viewModel.selectedValues[currentIndex].rank = targetRank
-            viewModel.selectedValues[targetIndex].rank = currentRank
-            
-            // Force UI update
-            viewModel.objectWillChange.send()
+            // Actually swap the array positions (not just ranks)
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                viewModel.selectedValues.swapAt(currentIndex, targetIndex)
+                
+                // Update ranks based on new positions (top = rank 1)
+                let nonGreyedValues = viewModel.selectedValues.filter { !$0.isGreyedOut }
+                for (idx, value) in nonGreyedValues.enumerated() {
+                    if let valueIndex = viewModel.selectedValues.firstIndex(where: { $0.id == value.id }) {
+                        viewModel.selectedValues[valueIndex].rank = idx + 1
+                    }
+                }
+                
+                // Force view refresh
+                refreshTrigger = UUID()
+            }
+        }
+    }
+    
+    private func moveValues(from source: IndexSet, to destination: Int) {
+        let nonGreyedValues = sortedValues.filter { !$0.isGreyedOut }
+        let greyedValues = sortedValues.filter { $0.isGreyedOut }
+        
+        var reorderedNonGreyed = nonGreyedValues
+        reorderedNonGreyed.move(fromOffsets: source, toOffset: destination)
+        
+        // Update ranks based on new positions
+        for (index, value) in reorderedNonGreyed.enumerated() {
+            if let valueIndex = viewModel.selectedValues.firstIndex(where: { $0.id == value.id }) {
+                viewModel.selectedValues[valueIndex].rank = index + 1
+            }
+        }
+        
+        // Combine back with greyed values
+        let allReordered = reorderedNonGreyed + greyedValues
+        
+        // Update the order in viewModel
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            viewModel.selectedValues = allReordered.map { value in
+                viewModel.selectedValues.first(where: { $0.id == value.id }) ?? value
+            }
+            // Force view refresh
+            refreshTrigger = UUID()
         }
     }
     
@@ -165,15 +216,15 @@ struct ValueRankingCard: View {
     @State private var isGreyedOut: Bool = false
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: BrandSpacing.md) {
             HStack {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: BrandSpacing.xs) {
                     Text(valueRanking.value.rawValue)
-                        .font(.headline)
-                        .foregroundColor(isGreyedOut ? .secondary : .primary)
+                        .font(BrandTypography.headline)
+                        .foregroundColor(isGreyedOut ? BrandColors.secondaryText : BrandColors.primaryText)
                     Text(valueRanking.value.description)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(BrandTypography.caption)
+                        .foregroundColor(BrandColors.secondaryText)
                 }
                 
                 Spacer()
@@ -182,6 +233,7 @@ struct ValueRankingCard: View {
                     HStack(spacing: BrandSpacing.xs) {
                         Image(systemName: "star.fill")
                             .font(.caption)
+                            .foregroundColor(BrandColors.accentYellow)
                         Text("優先級：\(rank)")
                             .font(BrandTypography.headline)
                             .foregroundColor(BrandColors.primaryBlue)
@@ -195,28 +247,32 @@ struct ValueRankingCard: View {
             
             if !isGreyedOut {
                 // Up/Down arrow buttons
-                HStack(spacing: 12) {
-                    Button(action: onMoveUp) {
+                HStack(spacing: BrandSpacing.md) {
+                    Button(action: {
+                        onMoveUp()
+                    }) {
                         Image(systemName: "arrow.up.circle.fill")
                             .font(.title2)
-                            .foregroundColor(index > 0 ? BrandColors.primaryBlue : BrandColors.tertiaryText)
+                            .foregroundColor(index > 0 && !isGreyedOut ? BrandColors.primaryBlue : BrandColors.tertiaryText)
                     }
-                    .disabled(index == 0)
+                    .disabled(index == 0 || isGreyedOut)
                     .buttonStyle(.plain)
                     
-                    Button(action: onMoveDown) {
+                    Button(action: {
+                        onMoveDown()
+                    }) {
                         Image(systemName: "arrow.down.circle.fill")
                             .font(.title2)
-                            .foregroundColor(index < totalCount - 1 ? BrandColors.primaryBlue : BrandColors.tertiaryText)
+                            .foregroundColor(index < totalCount - 1 && !isGreyedOut ? BrandColors.primaryBlue : BrandColors.tertiaryText)
                     }
-                    .disabled(index >= totalCount - 1)
+                    .disabled(index >= totalCount - 1 || isGreyedOut)
                     .buttonStyle(.plain)
                     
                     Spacer()
                     
                     Text("位置決定優先級")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(BrandTypography.caption)
+                        .foregroundColor(BrandColors.secondaryText)
                 }
                 
                 TextField("相關回憶或具體情境（選填）", text: $relatedMemory, axis: .vertical)
@@ -233,6 +289,11 @@ struct ValueRankingCard: View {
                         if isGreyedOut {
                             viewModel.selectedValues[index].rank = 0
                             rank = 0
+                        } else {
+                            // Assign a rank when un-greyed
+                            let nonGreyedCount = viewModel.selectedValues.filter { !$0.isGreyedOut }.count
+                            viewModel.selectedValues[index].rank = nonGreyedCount + 1
+                            rank = nonGreyedCount + 1
                         }
                     }
                 }) {
@@ -240,20 +301,33 @@ struct ValueRankingCard: View {
                         Image(systemName: isGreyedOut ? "eye.slash.fill" : "eye.slash")
                         Text(isGreyedOut ? "取消標記為不重要" : "標記為不重要")
                     }
-                    .font(.subheadline)
-                    .foregroundColor(isGreyedOut ? .blue : .secondary)
+                    .font(BrandTypography.subheadline)
+                    .foregroundColor(isGreyedOut ? BrandColors.primaryBlue : BrandColors.secondaryText)
                 }
             }
         }
         .padding(BrandSpacing.lg)
-        .background(isGreyedOut ? BrandColors.tertiaryBackground : BrandColors.secondaryBackground)
-        .cornerRadius(BrandRadius.medium)
-        .shadow(color: BrandShadow.small.color, radius: BrandShadow.small.radius, x: BrandShadow.small.x, y: BrandShadow.small.y)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(isGreyedOut ? BrandColors.tertiaryBackground : BrandColors.secondaryBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(isGreyedOut ? Color.clear : BrandColors.primaryBlue.opacity(0.2), lineWidth: 1)
+                )
+        )
+        .shadow(color: BrandColors.primaryBlue.opacity(isGreyedOut ? 0.1 : 0.2), radius: 10, x: 0, y: 5)
         .opacity(isGreyedOut ? 0.6 : 1.0)
+        // Removed drag gesture - only arrow buttons allowed for ranking
         .onAppear {
             rank = valueRanking.rank
             relatedMemory = valueRanking.relatedMemory ?? ""
             isGreyedOut = valueRanking.isGreyedOut
+        }
+        .onChange(of: valueRanking.rank) { newRank in
+            rank = newRank
+        }
+        .onChange(of: valueRanking.isGreyedOut) { newValue in
+            isGreyedOut = newValue
         }
         .onChange(of: relatedMemory) { newValue in
             if let index = viewModel.selectedValues.firstIndex(where: { $0.id == valueRanking.id }) {

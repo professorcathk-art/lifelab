@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var dataService = DataService.shared
     @StateObject private var viewModel = InitialScanViewModel()
+    @StateObject private var themeManager = ThemeManager.shared
     
     var hasCompletedInitialScan: Bool {
         dataService.userProfile?.lifeBlueprint != nil
@@ -11,7 +12,7 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(.systemBackground)
+                BrandColors.background
                     .ignoresSafeArea()
                 
                 if hasCompletedInitialScan {
@@ -22,6 +23,7 @@ struct ContentView: View {
                         .environmentObject(viewModel)
                         .onAppear {
                             if let profile = dataService.userProfile {
+                                viewModel.basicInfo = profile.basicInfo ?? BasicUserInfo()
                                 viewModel.selectedInterests = profile.interests
                                 viewModel.strengths = profile.strengths
                                 viewModel.selectedValues = profile.values
@@ -34,6 +36,10 @@ struct ContentView: View {
                                     viewModel.currentStep = .values
                                 } else if !profile.interests.isEmpty {
                                     viewModel.currentStep = .strengths
+                                } else if profile.basicInfo != nil {
+                                    viewModel.currentStep = .interests
+                                } else {
+                                    viewModel.currentStep = .basicInfo
                                 }
                             }
                         }

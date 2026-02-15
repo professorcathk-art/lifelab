@@ -36,6 +36,9 @@ struct ReviewInitialScanView: View {
             
             Group {
                 switch viewModel.currentStep {
+                case .basicInfo:
+                    BasicInfoView()
+                        .environmentObject(viewModel)
                 case .interests:
                     InterestsSelectionView()
                         .environmentObject(viewModel)
@@ -48,6 +51,10 @@ struct ReviewInitialScanView: View {
                 case .aiSummary:
                     AISummaryView()
                         .environmentObject(viewModel)
+                case .loading:
+                    PlanGenerationLoadingView {
+                        viewModel.currentStep = .payment
+                    }
                 case .payment:
                     PaymentView()
                         .environmentObject(viewModel)
@@ -58,43 +65,10 @@ struct ReviewInitialScanView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             
-            // Navigation buttons
-            HStack(spacing: 12) {
-                if viewModel.currentStep != .interests {
-                    Button(action: {
-                        viewModel.saveProgress()
-                        viewModel.moveToPreviousStep()
-                    }) {
-                        HStack {
-                            Image(systemName: "chevron.left")
-                            Text("上一步")
-                        }
-                        .font(.subheadline)
-                        .foregroundColor(.blue)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue.opacity(0.1))
-                        .cornerRadius(12)
-                    }
-                }
-                
-                if viewModel.currentStep != .blueprint {
-                    Button(action: {
-                        viewModel.saveProgress()
-                        viewModel.moveToNextStep()
-                    }) {
-                        HStack {
-                            Text("下一步")
-                            Image(systemName: "chevron.right")
-                        }
-                        .font(.subheadline)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .cornerRadius(12)
-                    }
-                } else {
+            // Navigation buttons - Hidden "上一步" and "下一步", users can use progress dots instead
+            // Only show "完成檢視" button on blueprint step
+            if viewModel.currentStep == .blueprint {
+                HStack(spacing: 12) {
                     Button(action: {
                         viewModel.saveProgress()
                         dismiss()
@@ -104,13 +78,13 @@ struct ReviewInitialScanView: View {
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Color.green)
+                            .background(Color(hex: "10b6cc"))
                             .cornerRadius(12)
                     }
                 }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 16)
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 16)
         }
         .onAppear {
             loadCurrentData()
@@ -122,6 +96,7 @@ struct ReviewInitialScanView: View {
         guard let profile = dataService.userProfile else { return }
         
         // Load data synchronously (fast operations)
+        viewModel.basicInfo = profile.basicInfo ?? BasicUserInfo()
         viewModel.selectedInterests = profile.interests
         viewModel.strengths = profile.strengths
         viewModel.selectedValues = profile.values
@@ -156,6 +131,10 @@ struct ReviewInitialScanView: View {
                 viewModel.initializeStrengthsQuestions()
             }
             viewModel.currentStep = .strengths
+        } else if profile.basicInfo != nil {
+            viewModel.currentStep = .interests
+        } else {
+            viewModel.currentStep = .basicInfo
         }
     }
     

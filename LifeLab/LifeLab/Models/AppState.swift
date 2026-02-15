@@ -9,12 +9,14 @@ enum AppStage: String, Codable {
 }
 
 enum InitialScanStep: Int, Codable {
-    case interests = 1
-    case strengths = 2
-    case values = 3
-    case aiSummary = 4
-    case payment = 5
-    case blueprint = 6
+    case basicInfo = 1  // New: Basic user information
+    case interests = 2
+    case strengths = 3
+    case values = 4
+    case aiSummary = 5
+    case loading = 6  // Loading animation BEFORE payment
+    case payment = 7
+    case blueprint = 8
 }
 
 enum DeepeningExplorationStep: Int, Codable {

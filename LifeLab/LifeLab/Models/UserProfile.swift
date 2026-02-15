@@ -2,6 +2,7 @@ import Foundation
 
 struct UserProfile: Codable, Identifiable {
     let id: UUID
+    var basicInfo: BasicUserInfo? // New: Basic user information
     var interests: [String]
     var strengths: [StrengthResponse]
     var values: [ValueRanking]
@@ -11,12 +12,15 @@ struct UserProfile: Codable, Identifiable {
     var acquiredStrengths: AcquiredStrengths?
     var feasibilityAssessment: FeasibilityAssessment?
     var lifeBlueprint: LifeBlueprint?
+    var lifeBlueprints: [LifeBlueprint] = []
     var actionPlan: ActionPlan?
     var createdAt: Date
     var updatedAt: Date
+    var lastBlueprintGenerationTime: Date? // Track last blueprint generation time for 1-hour cooldown
     
-    init(id: UUID = UUID(), interests: [String] = [], strengths: [StrengthResponse] = [], values: [ValueRanking] = [], flowDiaryEntries: [FlowDiaryEntry] = [], valuesQuestions: ValuesQuestions? = nil, resourceInventory: ResourceInventory? = nil, acquiredStrengths: AcquiredStrengths? = nil, feasibilityAssessment: FeasibilityAssessment? = nil, lifeBlueprint: LifeBlueprint? = nil, actionPlan: ActionPlan? = nil, createdAt: Date = Date(), updatedAt: Date = Date()) {
+    init(id: UUID = UUID(), basicInfo: BasicUserInfo? = nil, interests: [String] = [], strengths: [StrengthResponse] = [], values: [ValueRanking] = [], flowDiaryEntries: [FlowDiaryEntry] = [], valuesQuestions: ValuesQuestions? = nil, resourceInventory: ResourceInventory? = nil, acquiredStrengths: AcquiredStrengths? = nil, feasibilityAssessment: FeasibilityAssessment? = nil, lifeBlueprint: LifeBlueprint? = nil, lifeBlueprints: [LifeBlueprint] = [], actionPlan: ActionPlan? = nil, createdAt: Date = Date(), updatedAt: Date = Date(), lastBlueprintGenerationTime: Date? = nil) {
         self.id = id
+        self.basicInfo = basicInfo
         self.interests = interests
         self.strengths = strengths
         self.values = values
@@ -26,9 +30,11 @@ struct UserProfile: Codable, Identifiable {
         self.acquiredStrengths = acquiredStrengths
         self.feasibilityAssessment = feasibilityAssessment
         self.lifeBlueprint = lifeBlueprint
+        self.lifeBlueprints = lifeBlueprints
         self.actionPlan = actionPlan
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.lastBlueprintGenerationTime = lastBlueprintGenerationTime
     }
 }
 
@@ -175,11 +181,15 @@ struct LifeBlueprint: Codable {
     var vocationDirections: [VocationDirection]
     var strengthsSummary: String
     var feasibilityAssessment: String
+    var version: Int // Version number (1 for initial, 2 for updated)
+    var createdAt: Date
     
-    init(vocationDirections: [VocationDirection] = [], strengthsSummary: String = "", feasibilityAssessment: String = "") {
+    init(vocationDirections: [VocationDirection] = [], strengthsSummary: String = "", feasibilityAssessment: String = "", version: Int = 1, createdAt: Date = Date()) {
         self.vocationDirections = vocationDirections
         self.strengthsSummary = strengthsSummary
         self.feasibilityAssessment = feasibilityAssessment
+        self.version = version
+        self.createdAt = createdAt
     }
 }
 
@@ -188,12 +198,16 @@ struct VocationDirection: Codable, Identifiable {
     var title: String
     var description: String
     var marketFeasibility: String
+    var priority: Int // Priority order (1 = highest, 2 = second, 3 = third, etc.)
+    var isFavorite: Bool // Marked as favorite by user
     
-    init(id: UUID = UUID(), title: String = "", description: String = "", marketFeasibility: String = "") {
+    init(id: UUID = UUID(), title: String = "", description: String = "", marketFeasibility: String = "", priority: Int = 0, isFavorite: Bool = false) {
         self.id = id
         self.title = title
         self.description = description
         self.marketFeasibility = marketFeasibility
+        self.priority = priority
+        self.isFavorite = isFavorite
     }
 }
 
@@ -202,12 +216,16 @@ struct ActionPlan: Codable {
     var midTerm: [ActionItem]
     var longTerm: [ActionItem]
     var milestones: [Milestone]
+    var todayTasks: [ActionItem] // Separate today's to-do list
+    var todayTasksLastGenerated: Date? // Track when today tasks were last generated
     
-    init(shortTerm: [ActionItem] = [], midTerm: [ActionItem] = [], longTerm: [ActionItem] = [], milestones: [Milestone] = []) {
+    init(shortTerm: [ActionItem] = [], midTerm: [ActionItem] = [], longTerm: [ActionItem] = [], milestones: [Milestone] = [], todayTasks: [ActionItem] = [], todayTasksLastGenerated: Date? = nil) {
         self.shortTerm = shortTerm
         self.midTerm = midTerm
         self.longTerm = longTerm
         self.milestones = milestones
+        self.todayTasks = todayTasks
+        self.todayTasksLastGenerated = todayTasksLastGenerated
     }
 }
 

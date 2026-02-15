@@ -80,7 +80,7 @@ struct FeasibilityAssessmentView: View {
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
                                 .padding()
-                                .background(Color.green)
+                                .background(Color(hex: "10b6cc"))
                                 .cornerRadius(12)
                         }
                         .padding(.horizontal, 20)
@@ -139,7 +139,7 @@ struct PathAssessmentCard: View {
                 HStack {
                     Spacer()
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
+                        .foregroundColor(Color(hex: "10b6cc"))
                         .font(.caption)
                 }
             }

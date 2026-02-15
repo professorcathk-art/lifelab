@@ -82,7 +82,7 @@ run: boot-simulator
 	echo "📱 Installing app on device: $$DEVICE_ID..."; \
 	xcrun simctl install $$DEVICE_ID "$$APP_PATH"; \
 	echo "▶️  Launching app..."; \
-	xcrun simctl launch $$DEVICE_ID com.yourname.LifeLab 2>/dev/null || xcrun simctl launch $$DEVICE_ID com.lifelab.LifeLab 2>/dev/null || echo "⚠️  Could not determine bundle ID, app installed but not launched"; \
+	xcrun simctl launch $$DEVICE_ID com.resonance.lifelab 2>/dev/null || echo "⚠️  Could not determine bundle ID, app installed but not launched"; \
 	echo "✅ App launched"
 
 # Clean build artifacts

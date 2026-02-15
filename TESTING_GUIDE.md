@@ -1,322 +1,189 @@
-# Complete Testing Guide
+# LifeLab 測試指南
 
-## 🚀 Quick Start Testing
+## 已完成的功能
 
-### Step 1: Build and Run
-```bash
-# Option 1: Command line
-make run
+### ✅ 1. 生成生命藍圖按鈕顯示預計時間
+- 在 `PaymentView` 中，生成生命藍圖按鈕現在顯示 "預計需要 2-3 分鐘"
+- 位置：付款頁面的 "跳過付款並生成生命藍圖" 按鈕
 
-# Option 2: Xcode
-# Open Xcode → Select iPhone 17 Pro Max → Click Run (⌘R)
-```
+### ✅ 2. 基礎用戶信息頁面
+- 新增 `BasicInfoView` 作為問卷的第一步
+- 收集信息：
+  - 居住地區（必填）
+  - 年齡（必填）
+  - 稱呼（必填）
+  - 職業（必填）
+  - 年薪（USD，可選）
+  - 家庭狀況（必填）
+  - 學歷（必填）
+- 這些信息會傳遞給 AI 用於生成更精準的建議
 
-### Step 2: Test Initial Scan (10 seconds timer)
-1. App launches → See "興趣選擇"
-2. Click "開始" → Timer starts at **10 seconds**
-3. Select keywords → Related keywords appear
-4. Timer expires → Auto-advances to next step
-5. Complete all 6 steps:
-   - Interests (10 sec timer)
-   - Strengths (5 questions)
-   - Values (drag to rank)
-   - AI Summary
-   - Payment (test mode - no real charge)
-   - Life Blueprint
+### ✅ 3. AI Prompt 優化
+- 更新了 `AIService.generateLifeBlueprint` 的 prompt：
+  - 要求 AI 考慮用戶的現實狀況（年齡、職業、學歷、家庭狀況、居住地區）
+  - 禁止過度樂觀或不切實際的建議
+  - 要求使用 USD 美元為單位並明確標註 currency
+  - 要求提供當地真實市場數據和例子
+  - 只生成 3 個方向（不是 5 個）
 
-### Step 3: Test Export/Share
-- On Life Blueprint screen:
-  - Click "分享" → iOS share sheet appears
-  - Click "導出" → File saved, share sheet appears
+### ✅ 4. 編輯生命藍圖頁面改進
+- 新增頂部 Save 按鈕
+- 新版本生成時，方向會增量添加到現有方向（不替換）
+- 每次生成新版本只生成 3 個方向
+- 可以查看和編輯所有版本的方向
 
-### Step 4: Test Deepening Exploration
-- Go to "深化探索" tab
-- Complete steps in order:
-  1. Flow Diary (3 days)
-  2. Values Questions (unlocks after Flow Diary)
-  3. Resource Inventory (unlocks after Values Questions)
-  4. Acquired Strengths (unlocks after Resource Inventory)
-  5. Feasibility Assessment (unlocks after Acquired Strengths)
+### ✅ 5. 今日任務左滑刪除
+- 在 `TodayTasksSection` 中，每個任務支持左滑刪除
+- 使用 SwiftUI 的 `swipeActions` modifier
 
----
+### ✅ 6. 登錄系統（基礎版本）
+- 創建了 `AuthService` 和 `LoginView`
+- 支持 Email 登錄/註冊（目前為模擬實現）
+- 支持 Apple Sign In
+- 登錄狀態會保存到 UserDefaults
 
-## 📱 Detailed Test Cases
+## 如何測試
 
-### Test Case 1: Initial Scan Flow
+### 在 iPhone 15 Pro 上測試
 
-**Objective**: Verify complete initial scan works
+#### 方法 1: 使用 Xcode（推薦）
 
-**Steps**:
-1. Launch app
-2. **Interests Selection**:
-   - Click "開始"
-   - Verify timer shows "剩餘時間：10秒"
-   - Select 3-5 keywords
-   - Verify selected keywords appear at bottom
-   - Wait for timer to expire OR click "繼續"
-   - ✅ Should advance to Strengths
+1. **連接設備**：
+   - 使用 USB 線連接 iPhone 15 Pro 到 Mac
+   - 在 iPhone 上信任電腦（如果首次連接）
+   - 在 Xcode 中選擇您的 iPhone 15 Pro 作為目標設備
 
-3. **Strengths Questionnaire**:
-   - Answer Question 1: Select keywords
-   - Navigate to Question 2
-   - Complete all 5 questions
-   - ✅ Should advance to Values
+2. **配置 Signing**：
+   - 在 Xcode 中選擇項目
+   - 進入 "Signing & Capabilities"
+   - 選擇您的 Team
+   - 添加 "Sign in with Apple" capability（如果需要測試 Apple Sign In）
 
-4. **Values Ranking**:
-   - Drag values to reorder
-   - Verify ranking numbers update
-   - Complete ranking
-   - ✅ Should advance to AI Summary
+3. **運行應用**：
+   - 點擊 Run 按鈕（或按 Cmd+R）
+   - 應用會編譯並安裝到您的設備上
+   - 首次運行時，需要在 iPhone 上信任開發者證書：
+     - 設置 > 通用 > VPN與設備管理
+     - 選擇您的開發者證書
+     - 點擊 "信任"
 
-5. **AI Summary**:
-   - Wait for summary to generate
-   - Verify summary text appears
-   - ✅ Should advance to Payment
-
-6. **Payment**:
-   - Click "立即支付"
-   - ✅ Should unlock blueprint (no real charge)
-
-7. **Life Blueprint**:
-   - Verify vocation directions appear
-   - Test "分享" button
-   - Test "導出" button
-   - Click "開始深化探索"
-   - ✅ Should navigate to MainTabView
-
-**Expected Result**: Complete flow works, data saves
-
----
-
-### Test Case 2: Deepening Exploration Progressive Unlock
-
-**Objective**: Verify progressive unlocking system
-
-**Steps**:
-1. Complete Initial Scan
-2. Go to "深化探索" tab
-3. **Flow Diary**:
-   - Should be unlocked (no lock icon)
-   - Click to open
-   - Record Day 1: activity, description, energy level
-   - Record Day 2
-   - Record Day 3
-   - Verify progress shows "已完成 3/3 天"
-   - Complete flow diary
-   - ✅ Values Questions should unlock
-
-4. **Values Questions**:
-   - Should now be unlocked
-   - Complete all questions
-   - ✅ Resource Inventory should unlock
-
-5. **Resource Inventory**:
-   - Should now be unlocked
-   - Fill all 4 categories
-   - ✅ Acquired Strengths should unlock
-
-6. **Acquired Strengths**:
-   - Should now be unlocked
-   - Fill all 4 categories
-   - ✅ Feasibility Assessment should unlock
-
-7. **Feasibility Assessment**:
-   - Should now be unlocked
-   - Evaluate all 6 paths
-   - Complete assessment
-
-**Expected Result**: Each step unlocks the next sequentially
-
----
-
-### Test Case 3: Dashboard Progress Tracking
-
-**Objective**: Verify progress bars update correctly
-
-**Steps**:
-1. Complete Initial Scan
-2. Go to Dashboard
-3. **Initial Scan Progress**:
-   - Should show 100% (green checkmark)
-   - Progress bar should be full
-
-4. **Deepening Exploration Progress**:
-   - Start at 0%
-   - Complete Flow Diary → Should show 20%
-   - Complete Values Questions → Should show 40%
-   - Complete Resource Inventory → Should show 60%
-   - Complete Acquired Strengths → Should show 80%
-   - Complete Feasibility Assessment → Should show 100% (checkmark)
-
-**Expected Result**: Progress bars update in real-time
-
----
-
-### Test Case 4: Data Persistence
-
-**Objective**: Verify data saves and persists
-
-**Steps**:
-1. Complete Initial Scan
-2. Complete Flow Diary (Day 1 only)
-3. **Close app completely**:
-   - Double-click home
-   - Swipe up on app
-4. **Reopen app**:
-   - Launch app again
-5. **Verify**:
-   - Should resume at correct step
-   - Flow Diary Day 1 should still be there
-   - All data intact
-
-**Expected Result**: All data persists after app close
-
----
-
-### Test Case 5: Export Functionality
-
-**Objective**: Verify export/share works
-
-**Steps**:
-1. Complete Initial Scan
-2. View Life Blueprint
-3. **Test Share**:
-   - Click "分享"
-   - Verify iOS share sheet appears
-   - Can share via Messages, Email, etc.
-
-4. **Test Export**:
-   - Click "導出"
-   - Verify file is created
-   - Verify share sheet appears
-   - Can save to Files app
-
-5. **Test Settings Export**:
-   - Go to Settings tab
-   - Click "導出所有數據"
-   - Verify complete data export
-   - Verify file contains all information
-
-**Expected Result**: Export/share functions work correctly
-
----
-
-## 🔄 How to Restart/Reset
-
-### Restart App in Simulator:
-1. **Double-click Home button** (or swipe up from bottom)
-2. **Swipe up** on LifeLab app card
-3. **Click LifeLab icon** to restart
-
-### Restart from Xcode:
-1. **Stop** (⏹️) button
-2. **Run** (▶️) or press **⌘R**
-
-### Reset All Data:
-1. Go to **Settings** tab
-2. Click **"清除所有數據"**
-3. Confirm deletion
-4. App resets to initial state
-
-### Reset Simulator:
-1. **Simulator > Device > Erase All Content and Settings**
-2. Wait for reset
-3. Run app again
-
----
-
-## ✅ Test Checklist
-
-### Initial Scan
-- [ ] Timer starts at 10 seconds
-- [ ] Timer counts down correctly
-- [ ] Keywords can be selected
-- [ ] Related keywords appear
-- [ ] Navigation between steps works
-- [ ] Data saves after each step
-- [ ] Payment unlocks blueprint
-- [ ] Share/Export buttons work
-
-### Deepening Exploration
-- [ ] Flow Diary unlocks first
-- [ ] Can record 3 days
-- [ ] Progress indicator works
-- [ ] Values Questions unlocks after Flow Diary
-- [ ] All questions can be answered
-- [ ] Resource Inventory unlocks after Values Questions
-- [ ] All 4 categories can be filled
-- [ ] Acquired Strengths unlocks after Resource Inventory
-- [ ] All 4 categories can be filled
-- [ ] Feasibility Assessment unlocks after Acquired Strengths
-- [ ] All 6 paths can be evaluated
-
-### Dashboard
-- [ ] Progress bars display correctly
-- [ ] Completion status updates
-- [ ] Life Blueprint preview shows
-
-### Settings
-- [ ] Export all data works
-- [ ] Clear data works (with confirmation)
-- [ ] Version number displays
-
-### Data Persistence
-- [ ] Data saves automatically
-- [ ] Data persists after app close
-- [ ] App resumes at correct step
-
----
-
-## 🎯 Quick Test Commands
+#### 方法 2: 使用命令行
 
 ```bash
-# Build only
-make build
+# 1. 列出可用設備
+xcrun xctrace list devices
 
-# Build and run
-make run
+# 2. 找到您的 iPhone 15 Pro 的 UDID
 
-# Clean build
-make clean
+# 3. 編譯並安裝到設備
+xcodebuild -project LifeLab/LifeLab.xcodeproj \
+  -scheme LifeLab \
+  -sdk iphoneos \
+  -destination 'platform=iOS,id=YOUR_DEVICE_UDID' \
+  build
 
-# List simulators
-make list-simulators
-
-# Check syntax
-make check
+# 4. 或使用 xcodebuild install（需要配置）
 ```
 
----
+### 測試流程
 
-## 📝 Testing Notes
+#### 1. 測試登錄
+- **Email 登錄**：
+  - 輸入任何 email（例如：test@example.com）
+  - 輸入任何 password（例如：123456）
+  - 點擊 "登錄"
+  - ✅ 應該成功登錄並進入應用
 
-- **Timer**: Now 10 seconds (was 60) for faster testing
-- **Payment**: Test mode - no real charge
-- **AI**: Currently mocked - generates sample data
-- **Data**: Saves to UserDefaults automatically
+- **Apple Sign In**：
+  - 點擊 "Sign in with Apple" 按鈕
+  - 使用真實的 Apple ID 登錄
+  - ✅ 應該成功登錄並進入應用
 
----
+#### 2. 測試基礎信息頁面
+- 第一個頁面是基礎信息頁面
+- 填寫：
+  - 居住地區：選擇一個地區（例如：香港）
+  - 年齡：輸入數字（例如：28）
+  - 稱呼：輸入名字（例如：小明）
+  - 職業：輸入職業（例如：軟體工程師）
+  - 年薪（可選）：輸入數字（例如：50000）
+  - 家庭狀況：選擇一個選項
+  - 學歷：選擇一個選項
+- 點擊 "繼續"
+- ✅ 應該進入興趣選擇頁面
 
-## 🐛 If Something Breaks
+#### 3. 測試生命藍圖生成
+- 完成所有問卷步驟（興趣、優勢、價值觀）
+- 在付款頁面，查看 "跳過付款並生成生命藍圖" 按鈕
+- ✅ 應該看到 "預計需要 2-3 分鐘" 的提示文字
+- 點擊按鈕開始生成
+- ✅ 應該看到加載動畫，等待 2-3 分鐘
 
-1. **Clean Build**: `make clean && make build`
-2. **Reset Simulator**: Erase All Content and Settings
-3. **Check Console**: Window > Devices and Simulators > Open Console
-4. **Restart Xcode**: Sometimes helps with build issues
+#### 4. 測試編輯生命藍圖
+- 在首頁點擊編輯按鈕（鉛筆圖標）
+- ✅ 應該看到頂部的 "保存" 按鈕
+- ✅ 應該看到所有方向，可以編輯、排序、設為最愛
 
----
+#### 5. 測試新版本生成
+- 完成深化探索的所有步驟
+- 點擊 "生成更新版生命藍圖"
+- ✅ 應該只生成 3 個新方向
+- ✅ 生成後自動導航到編輯頁面
+- ✅ 新方向應該增量添加到現有方向（不替換）
 
-## ✅ Health Check Status
+#### 6. 測試今日任務左滑刪除
+- 進入任務管理頁面
+- 切換到 "今日任務" 標籤
+- 如果有任務，左滑任何任務
+- ✅ 應該看到紅色的 "刪除" 按鈕
+- 點擊刪除
+- ✅ 任務應該被刪除
 
-- ✅ **Build**: SUCCESS
-- ✅ **Errors**: 0
-- ✅ **Critical Warnings**: 0
-- ✅ **Code Quality**: Good
-- ✅ **Architecture**: MVVM followed
-- ✅ **Ready for Testing**: YES
+## 注意事項
 
----
+### 登錄系統
+- **Email 登錄**：目前是模擬實現，任何 email/password 都可以登錄
+- **Apple Sign In**：需要真實的 Apple ID，並且需要在 Xcode 中配置 Signing & Capabilities
+- **數據保存**：登錄後，用戶數據會保存到 UserDefaults（本地存儲）
 
-## 🚀 You're Ready!
+### 測試建議
+1. **首次測試**：建議先清除應用數據，從頭開始測試完整流程
+2. **數據持久化**：登錄後，數據會保存到本地，下次打開應用會自動登錄
+3. **登出**：目前沒有登出按鈕，可以在設定頁面添加（需要實現）
 
-The app is healthy and ready to test. Follow the test cases above to verify everything works!
+## 後續改進建議
+
+1. **真實的 Email 認證**：
+   - 集成 Firebase Auth 或其他認證服務
+   - 實現密碼重置功能
+
+2. **數據同步**：
+   - 將用戶數據同步到雲端（Firebase、AWS 等）
+   - 實現多設備同步
+
+3. **登出功能**：
+   - 在設定頁面添加登出按鈕
+   - 清除本地數據
+
+4. **Apple Sign In 配置**：
+   - 在 Xcode 中配置 Signing & Capabilities
+   - 添加 Sign in with Apple capability
+   - 配置 App ID 和 Provisioning Profile
+
+## 編譯和運行
+
+```bash
+# 編譯項目
+cd /Users/mickeylau/lifelab
+xcodebuild -project LifeLab/LifeLab.xcodeproj -scheme LifeLab -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17 Pro Max' build
+
+# 或在 Xcode 中直接運行
+```
+
+## 問題排查
+
+如果遇到問題：
+1. 檢查 Xcode 控制台的日誌
+2. 確認所有依賴都已正確導入
+3. 確認 Signing & Capabilities 配置正確（對於 Apple Sign In）
+4. 檢查設備是否已信任開發者證書

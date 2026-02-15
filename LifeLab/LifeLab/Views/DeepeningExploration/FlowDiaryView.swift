@@ -26,7 +26,7 @@ struct FlowDiaryView: View {
                     HStack(spacing: 8) {
                         ForEach(Array(0..<max(3, viewModel.entries.count)), id: \.self) { index in
                             Circle()
-                                .fill(index < viewModel.completedEvents ? Color.green : Color.gray.opacity(0.3))
+                                .fill(index < viewModel.completedEvents ? Color(hex: "10b6cc") : Color.gray.opacity(0.3))
                                 .frame(width: 12, height: 12)
                         }
                     }
@@ -93,7 +93,7 @@ struct FlowDiaryView: View {
                                 )
                             )
                             .cornerRadius(BrandRadius.medium)
-                            .shadow(color: BrandColors.success.opacity(0.3), radius: 8, x: 0, y: 4)
+                            .shadow(color: Color(hex: "10b6cc").opacity(0.3), radius: 8, x: 0, y: 4)
                         }
                         .buttonStyle(.plain)
                         .padding(.horizontal, BrandSpacing.xl)
@@ -133,7 +133,7 @@ struct FlowEventCard: View {
                 
                 if isCompleted {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
+                        .foregroundColor(Color(hex: "10b6cc"))
                 }
                 
                 if isCompleted {

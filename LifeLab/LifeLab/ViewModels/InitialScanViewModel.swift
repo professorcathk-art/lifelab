@@ -4,11 +4,13 @@ import Combine
 
 @MainActor
 class InitialScanViewModel: ObservableObject {
-    @Published var currentStep: InitialScanStep = .interests
+    @Published var currentStep: InitialScanStep = .basicInfo
+    @Published var basicInfo: BasicUserInfo = BasicUserInfo()
     @Published var selectedInterests: [String] = []
     @Published var availableKeywords: [String] = []
-    @Published var timeRemaining: Int = 10
+    @Published var timeRemaining: Int = 15
     @Published var isTimerActive = false
+    @Published var showConfirmButton = false
     @Published var strengths: [StrengthResponse] = []
     @Published var currentStrengthQuestionIndex = 0
     @Published var selectedValues: [ValueRanking] = []
@@ -27,21 +29,42 @@ class InitialScanViewModel: ObservableObject {
     }
     
     func loadInitialKeywords() {
+        // Only load first-level keywords initially
         availableKeywords = interestDictionary.getAllKeywords()
     }
     
+    func resetInterestSelection() {
+        stopTimer()
+        selectedInterests = []
+        availableKeywords = interestDictionary.getAllKeywords()
+        timeRemaining = 15
+        isTimerActive = false
+        showConfirmButton = false
+    }
+    
     func selectInterest(_ keyword: String) {
+        // Check if this is a first-level keyword
+        let firstLevelKeywords = interestDictionary.getAllKeywords()
+        let isFirstLevel = firstLevelKeywords.contains(keyword)
+        
         selectedInterests.append(keyword)
         availableKeywords.removeAll { $0 == keyword }
         
-        let relatedKeywords = interestDictionary.getRelatedKeywords(for: keyword)
-        let newKeywords = relatedKeywords.filter { !selectedInterests.contains($0) && !availableKeywords.contains($0) }
-        availableKeywords.append(contentsOf: newKeywords)
+        // If it's a first-level keyword, show related keywords
+        if isFirstLevel {
+            let relatedKeywords = interestDictionary.getRelatedKeywords(for: keyword)
+            let newKeywords = relatedKeywords.filter { 
+                !selectedInterests.contains($0) && 
+                !availableKeywords.contains($0) 
+            }
+            availableKeywords.append(contentsOf: newKeywords)
+        }
     }
     
     func startInterestTimer() {
         isTimerActive = true
-        timeRemaining = 10
+        showConfirmButton = false
+        timeRemaining = 15
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] timer in
             guard let self = self else {
                 timer.invalidate()
@@ -52,10 +75,16 @@ class InitialScanViewModel: ObservableObject {
                     self.timeRemaining -= 1
                 } else {
                     self.stopTimer()
-                    self.moveToNextStep()
+                    // Don't auto-navigate, show confirm button instead
+                    self.showConfirmButton = true
                 }
             }
         }
+    }
+    
+    func confirmInterestSelection() {
+        stopTimer()
+        moveToNextStep()
     }
     
     func stopTimer() {
@@ -67,6 +96,12 @@ class InitialScanViewModel: ObservableObject {
     func moveToNextStep() {
         stopTimer()
         switch currentStep {
+        case .basicInfo:
+            // Save basic info to profile
+            DataService.shared.updateUserProfile { profile in
+                profile.basicInfo = basicInfo
+            }
+            currentStep = .interests
         case .interests:
             initializeStrengthsQuestions()
             currentStep = .strengths
@@ -77,10 +112,12 @@ class InitialScanViewModel: ObservableObject {
             currentStep = .aiSummary
             generateAISummary()
         case .aiSummary:
+            currentStep = .loading
+        case .loading:
             currentStep = .payment
         case .payment:
-            currentStep = .blueprint
-            generateLifeBlueprint()
+            // Payment completion triggers blueprint generation directly
+            break
         case .blueprint:
             break
         }
@@ -89,16 +126,20 @@ class InitialScanViewModel: ObservableObject {
     func moveToPreviousStep() {
         stopTimer()
         switch currentStep {
-        case .interests:
+        case .basicInfo:
             break // Already at first step
+        case .interests:
+            currentStep = .basicInfo
         case .strengths:
             currentStep = .interests
         case .values:
             currentStep = .strengths
         case .aiSummary:
             currentStep = .values
-        case .payment:
+        case .loading:
             currentStep = .aiSummary
+        case .payment:
+            currentStep = .loading
         case .blueprint:
             currentStep = .payment
         }
@@ -133,6 +174,7 @@ class InitialScanViewModel: ObservableObject {
     
     func resetInitialScan() {
         stopTimer()
+        basicInfo = BasicUserInfo()
         selectedInterests = []
         availableKeywords = interestDictionary.getAllKeywords()
         strengths = []
@@ -141,7 +183,7 @@ class InitialScanViewModel: ObservableObject {
         aiSummary = ""
         hasPaid = false
         lifeBlueprint = nil
-        currentStep = .interests
+        currentStep = .basicInfo
         loadInitialKeywords()
     }
     
@@ -163,6 +205,44 @@ class InitialScanViewModel: ObservableObject {
         if let index = strengths.firstIndex(where: { $0.questionId == questionId }) {
             strengths[index].selectedKeywords.removeAll { $0 == keyword }
         }
+    }
+    
+    func getAvailableKeywords(for questionId: Int) -> [String] {
+        guard let question = strengthsQuestions.questions.first(where: { $0.id == questionId }) else {
+            return []
+        }
+        
+        // Get first-level keywords (keys of keywordHierarchy)
+        let firstLevelKeywords = Array(question.keywordHierarchy.keys)
+        
+        // Get selected first-level keywords
+        if let response = strengths.first(where: { $0.questionId == questionId }) {
+            let selectedFirstLevel = response.selectedKeywords.filter { firstLevelKeywords.contains($0) }
+            
+            // If any first-level keyword is selected, show related keywords
+            if !selectedFirstLevel.isEmpty {
+                var availableKeywords: [String] = []
+                
+                // Add all first-level keywords (for unselecting)
+                availableKeywords.append(contentsOf: firstLevelKeywords)
+                
+                // Add related keywords for selected first-level keywords
+                for selectedKeyword in selectedFirstLevel {
+                    if let relatedKeywords = question.keywordHierarchy[selectedKeyword] {
+                        let newKeywords = relatedKeywords.filter { 
+                            !response.selectedKeywords.contains($0) && 
+                            !availableKeywords.contains($0) 
+                        }
+                        availableKeywords.append(contentsOf: newKeywords)
+                    }
+                }
+                
+                return availableKeywords
+            }
+        }
+        
+        // If no first-level keyword selected, only show first-level keywords
+        return firstLevelKeywords
     }
     
     func initializeValues() {
@@ -261,7 +341,8 @@ class InitialScanViewModel: ObservableObject {
     
     func completePayment() {
         hasPaid = true
-        moveToNextStep()
+        // Start loading blueprint generation AFTER payment
+        generateLifeBlueprint()
     }
     
     func generateLifeBlueprint() {
@@ -290,33 +371,113 @@ class InitialScanViewModel: ObservableObject {
                 }
                 
                 await MainActor.run {
-                    self.lifeBlueprint = blueprint
+                    var updatedBlueprint = blueprint
+                    updatedBlueprint.version = 1
+                    updatedBlueprint.createdAt = Date()
+                    self.lifeBlueprint = updatedBlueprint
                     self.isLoadingBlueprint = false
+                    
+                    // Log the blueprint content to verify AI is working
+                    print("✅ Saving Version 1 blueprint:")
+                    print("  - Directions count: \(blueprint.vocationDirections.count)")
+                    print("  - First direction title: \(blueprint.vocationDirections.first?.title ?? "none")")
+                    print("  - Strengths summary length: \(blueprint.strengthsSummary.count) chars")
+                    print("  - Strengths summary preview: \(blueprint.strengthsSummary.prefix(100))...")
+                    
                     DataService.shared.updateUserProfile { profile in
-                        profile.lifeBlueprint = blueprint
+                        profile.lifeBlueprint = updatedBlueprint
+                        // Also add to lifeBlueprints array so it shows in ProfileView
+                        if !profile.lifeBlueprints.contains(where: { $0.version == 1 }) {
+                            profile.lifeBlueprints.append(updatedBlueprint)
+                            print("✅ Added Version 1 to lifeBlueprints array")
+                        } else {
+                            // Update existing Version 1 if it exists
+                            if let index = profile.lifeBlueprints.firstIndex(where: { $0.version == 1 }) {
+                                profile.lifeBlueprints[index] = updatedBlueprint
+                                print("✅ Updated existing Version 1 in lifeBlueprints array")
+                            }
+                        }
+                    }
+                    // Auto-navigate to blueprint after loading completes
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        self.currentStep = .blueprint
                     }
                 }
             } catch {
+                print("❌❌❌ CRITICAL ERROR: Life blueprint generation failed!")
+                print("❌❌❌ Error details: \(error)")
+                print("❌❌❌ Error domain: \((error as NSError).domain)")
+                print("❌❌❌ Error code: \((error as NSError).code)")
+                print("❌❌❌ Error description: \((error as NSError).localizedDescription)")
+                
                 await MainActor.run {
                     self.isLoadingBlueprint = false
+                    // DO NOT use fallback silently - show error to user
+                    // Instead, retry API call or show error message
+                    print("❌❌❌ NOT using fallback - API call failed!")
+                    print("❌❌❌ Please check Xcode console for API call logs")
                 }
                 
-                // Use fallback if API fails
-                var profile = UserProfile()
-                profile.interests = selectedInterests
-                profile.strengths = strengths
-                profile.values = selectedValues.filter { $0.rank > 0 && !$0.isGreyedOut }
-                
+                // Retry API call once
+                print("🔄 Retrying API call...")
                 do {
-                    let fallbackBlueprint = try await AIService.shared.generateLifeBlueprintFallback(profile: profile)
+                    var profile = UserProfile()
+                    profile.interests = selectedInterests
+                    profile.strengths = strengths
+                    profile.values = selectedValues.filter { $0.rank > 0 && !$0.isGreyedOut }
+                    
+                    let retryBlueprint = try await AIService.shared.generateLifeBlueprint(profile: profile)
                     await MainActor.run {
-                        self.lifeBlueprint = fallbackBlueprint
+                        var updatedBlueprint = retryBlueprint
+                        updatedBlueprint.version = 1
+                        updatedBlueprint.createdAt = Date()
+                        self.lifeBlueprint = updatedBlueprint
+                        self.isLoadingBlueprint = false
+                        
+                        print("✅✅✅ Retry successful! Got AI-generated blueprint")
                         DataService.shared.updateUserProfile { profile in
-                            profile.lifeBlueprint = fallbackBlueprint
+                            profile.lifeBlueprint = updatedBlueprint
+                            if !profile.lifeBlueprints.contains(where: { $0.version == 1 }) {
+                                profile.lifeBlueprints.append(updatedBlueprint)
+                            }
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            self.currentStep = .blueprint
                         }
                     }
                 } catch {
-                    print("Fallback generation failed: \(error)")
+                    print("❌❌❌ Retry also failed: \(error)")
+                    // Only use fallback as last resort, and mark it clearly
+                    var profile = UserProfile()
+                    profile.interests = selectedInterests
+                    profile.strengths = strengths
+                    profile.values = selectedValues.filter { $0.rank > 0 && !$0.isGreyedOut }
+                    
+                    do {
+                        print("⚠️⚠️⚠️ Using fallback as last resort - THIS IS NOT AI GENERATED!")
+                        let fallbackBlueprint = try await AIService.shared.generateLifeBlueprintFallback(profile: profile)
+                        await MainActor.run {
+                            var updatedBlueprint = fallbackBlueprint
+                            updatedBlueprint.version = 1
+                            updatedBlueprint.createdAt = Date()
+                            // Mark as fallback in the blueprint
+                            self.lifeBlueprint = updatedBlueprint
+                            self.isLoadingBlueprint = false
+                            
+                            print("⚠️⚠️⚠️ WARNING: Using fallback blueprint - API failed!")
+                            DataService.shared.updateUserProfile { profile in
+                                profile.lifeBlueprint = updatedBlueprint
+                                if !profile.lifeBlueprints.contains(where: { $0.version == 1 }) {
+                                    profile.lifeBlueprints.append(updatedBlueprint)
+                                }
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                self.currentStep = .blueprint
+                            }
+                        }
+                    } catch {
+                        print("❌❌❌ Even fallback failed: \(error)")
+                    }
                 }
             }
         }

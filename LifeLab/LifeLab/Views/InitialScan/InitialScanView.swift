@@ -11,6 +11,8 @@ struct InitialScanView: View {
             
             Group {
                 switch viewModel.currentStep {
+                case .basicInfo:
+                    BasicInfoView()
                 case .interests:
                     InterestsSelectionView()
                 case .strengths:
@@ -19,6 +21,12 @@ struct InitialScanView: View {
                     ValuesRankingView()
                 case .aiSummary:
                     AISummaryView()
+                case .loading:
+                    // Show loading animation BEFORE payment (just animation, no AI)
+                    PlanGenerationLoadingView {
+                        // After animation completes, show payment page
+                        viewModel.currentStep = .payment
+                    }
                 case .payment:
                     PaymentView()
                 case .blueprint:
@@ -41,7 +49,7 @@ struct ProgressIndicator: View {
     
     var body: some View {
         HStack(spacing: BrandSpacing.sm) {
-            ForEach(1...6, id: \.self) { index in
+            ForEach(1...8, id: \.self) { index in
                 Button(action: {
                     if let targetStep = InitialScanStep(rawValue: index) {
                         onStepTap?(targetStep)

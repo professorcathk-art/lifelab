@@ -20,6 +20,24 @@ struct ProfileView: View {
                             }
                             .padding(.top, BrandSpacing.xxxl)
                             
+                            // Venn Diagram
+                            if !profile.interests.isEmpty && !profile.strengths.isEmpty && !profile.values.isEmpty {
+                                VStack(alignment: .leading, spacing: BrandSpacing.md) {
+                                    Text("關鍵詞總覽")
+                                        .font(BrandTypography.title2)
+                                        .foregroundColor(BrandColors.primaryText)
+                                        .padding(.horizontal, BrandSpacing.xl)
+                                    
+                                    VennDiagramView(
+                                        interests: profile.interests,
+                                        strengths: profile.strengths.flatMap { $0.selectedKeywords },
+                                        values: profile.values.filter { !$0.isGreyedOut }.map { $0.value.rawValue }
+                                    )
+                                    .brandCard()
+                                    .padding(.horizontal, BrandSpacing.xl)
+                                }
+                            }
+                            
                             if !profile.interests.isEmpty {
                                 ProfileSection(title: "興趣", items: profile.interests)
                             }
@@ -76,13 +94,72 @@ struct ProfileView: View {
                                 }
                             }
                             
-                            // 初版生命藍圖
-                            if let blueprint = profile.lifeBlueprint {
-                                VStack(alignment: .leading, spacing: 16) {
+                            // 生命藍圖 (show all versions)
+                            if !profile.lifeBlueprints.isEmpty || profile.lifeBlueprint != nil {
+                                VStack(alignment: .leading, spacing: BrandSpacing.lg) {
+                                    Text("生命藍圖")
+                                        .font(BrandTypography.title2)
+                                        .foregroundColor(BrandColors.primaryText)
+                                        .padding(.horizontal, BrandSpacing.xl)
+                                    
+                                    // Show all versions - combine lifeBlueprint and lifeBlueprints
+                                    let allBlueprints: [LifeBlueprint] = {
+                                        var blueprints = profile.lifeBlueprints
+                                        // Add current lifeBlueprint if it's not already in the array
+                                        if let currentBlueprint = profile.lifeBlueprint {
+                                            if !blueprints.contains(where: { $0.version == currentBlueprint.version && abs($0.createdAt.timeIntervalSince(currentBlueprint.createdAt)) < 1 }) {
+                                                blueprints.append(currentBlueprint)
+                                            }
+                                        }
+                                        // Sort by version (newest first)
+                                        return blueprints.sorted { $0.version > $1.version }
+                                    }()
+                                    
+                                    ForEach(allBlueprints, id: \.version) { blueprint in
+                                        VStack(alignment: .leading, spacing: BrandSpacing.md) {
+                                            HStack {
+                                                Text("Version \(blueprint.version)")
+                                                    .font(BrandTypography.headline)
+                                                    .foregroundColor(BrandColors.primaryBlue)
+                                                Spacer()
+                                                Text(blueprint.createdAt.formatted(date: .abbreviated, time: .omitted))
+                                                    .font(BrandTypography.caption)
+                                                    .foregroundColor(BrandColors.secondaryText)
+                                            }
+                                            .padding(.horizontal, BrandSpacing.xl)
+                                            
+                                            if !blueprint.vocationDirections.isEmpty {
+                                                ForEach(blueprint.vocationDirections) { direction in
+                                                    VocationDirectionCard(direction: direction)
+                                                        .padding(.horizontal, BrandSpacing.xl)
+                                                }
+                                            }
+                                            
+                                            if !blueprint.strengthsSummary.isEmpty {
+                                                VStack(alignment: .leading, spacing: BrandSpacing.xs) {
+                                                    Text("優勢總結")
+                                                        .font(BrandTypography.headline)
+                                                    Text(blueprint.strengthsSummary)
+                                                        .font(BrandTypography.body)
+                                                        .lineSpacing(8)
+                                                }
+                                                .padding(BrandSpacing.lg)
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                                .background(BrandColors.secondaryBackground)
+                                                .cornerRadius(BrandRadius.medium)
+                                                .padding(.horizontal, BrandSpacing.xl)
+                                            }
+                                        }
+                                        .brandCard()
+                                        .padding(.horizontal, BrandSpacing.xl)
+                                    }
+                                }
+                            } else if let blueprint = profile.lifeBlueprint {
+                                VStack(alignment: .leading, spacing: BrandSpacing.lg) {
                                     Text("初版生命藍圖")
-                                        .font(.title2)
-                                        .fontWeight(.semibold)
-                                        .padding(.horizontal, 20)
+                                        .font(BrandTypography.title2)
+                                        .foregroundColor(BrandColors.primaryText)
+                                        .padding(.horizontal, BrandSpacing.xl)
                                     
                                     if !blueprint.vocationDirections.isEmpty {
                                         ForEach(blueprint.vocationDirections) { direction in

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DashboardView: View {
     @EnvironmentObject var dataService: DataService
+    @StateObject private var themeManager = ThemeManager.shared
     
     private func calculateInitialScanProgress() -> Double {
         guard let profile = dataService.userProfile else { return 0.0 }
@@ -62,10 +63,41 @@ struct DashboardView: View {
                                 Text("您的生命藍圖")
                                     .font(BrandTypography.title2)
                                     .foregroundColor(BrandColors.primaryText)
+                                
+                                Spacer()
+                                
+                                // Edit button - navigate to blueprint view
+                                NavigationLink(destination: LifeBlueprintEditView(blueprint: blueprint)) {
+                                    Image(systemName: "pencil")
+                                        .font(.title3)
+                                        .foregroundColor(BrandColors.primaryBlue)
+                                        .padding(BrandSpacing.sm)
+                                        .background(BrandColors.primaryBlue.opacity(0.1))
+                                        .cornerRadius(BrandRadius.small)
+                                }
+                                .buttonStyle(.plain)
                             }
                             
-                            ForEach(blueprint.vocationDirections.prefix(2)) { direction in
-                                VocationDirectionCard(direction: direction)
+                            // Only show favorite direction on homepage
+                            if let favoriteDirection = blueprint.vocationDirections.first(where: { $0.isFavorite }) {
+                                VStack(alignment: .leading, spacing: BrandSpacing.sm) {
+                                    HStack {
+                                        Image(systemName: "star.fill")
+                                            .foregroundColor(.yellow)
+                                        Text("當前行動方向")
+                                            .font(BrandTypography.subheadline)
+                                            .foregroundColor(BrandColors.secondaryText)
+                                    }
+                                    VocationDirectionCard(direction: favoriteDirection)
+                                }
+                            } else if !blueprint.vocationDirections.isEmpty {
+                                // If no favorite, show first direction with hint
+                                VStack(alignment: .leading, spacing: BrandSpacing.sm) {
+                                    Text("提示：請在編輯頁面選擇一個方向設為最愛")
+                                        .font(BrandTypography.caption)
+                                        .foregroundColor(BrandColors.secondaryText)
+                                    VocationDirectionCard(direction: blueprint.vocationDirections[0])
+                                }
                             }
                         }
                         .brandCard()
@@ -79,6 +111,21 @@ struct DashboardView: View {
                                 .foregroundColor(BrandColors.primaryText)
                             
                             Spacer()
+                            
+                            // Dark mode toggle
+                            Button(action: {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                    themeManager.isDarkMode.toggle()
+                                }
+                            }) {
+                                Image(systemName: themeManager.isDarkMode ? "sun.max.fill" : "moon.fill")
+                                    .font(.title3)
+                                    .foregroundColor(BrandColors.primaryBlue)
+                                    .padding(BrandSpacing.sm)
+                                    .background(BrandColors.primaryBlue.opacity(0.1))
+                                    .cornerRadius(BrandRadius.small)
+                            }
+                            .buttonStyle(.plain)
                             
                             if dataService.userProfile?.lifeBlueprint != nil {
                                 NavigationLink(destination: ReviewInitialScanView()) {
@@ -98,14 +145,17 @@ struct DashboardView: View {
                             progress: calculateInitialScanProgress()
                         )
                         
-                        ProgressCard(
-                            title: "深化探索",
-                            isCompleted: isDeepeningExplorationComplete(),
-                            progress: calculateDeepeningProgress()
-                        )
+                        NavigationLink(destination: DeepeningExplorationView()) {
+                            ProgressCard(
+                                title: "深化探索",
+                                isCompleted: isDeepeningExplorationComplete(),
+                                progress: calculateDeepeningProgress()
+                            )
+                        }
+                        .buttonStyle(.plain)
                         
                         if dataService.userProfile?.actionPlan != nil {
-                            NavigationLink(destination: ActionPlanReviewView()) {
+                            NavigationLink(destination: TaskManagementView()) {
                                 ProgressCard(
                                     title: "行動計劃",
                                     isCompleted: true,
@@ -114,11 +164,14 @@ struct DashboardView: View {
                             }
                             .buttonStyle(.plain)
                         } else {
-                            ProgressCard(
-                                title: "行動計劃",
-                                isCompleted: false,
-                                progress: 0.0
-                            )
+                            NavigationLink(destination: TaskManagementView()) {
+                                ProgressCard(
+                                    title: "行動計劃",
+                                    isCompleted: false,
+                                    progress: 0.0
+                                )
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                     .brandCard()
@@ -151,7 +204,7 @@ struct ProgressCard: View {
                     .foregroundColor(BrandColors.primaryText)
                 Spacer()
                 Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
-                    .foregroundColor(isCompleted ? BrandColors.success : BrandColors.tertiaryText)
+                    .foregroundColor(isCompleted ? Color(hex: "10b6cc") : BrandColors.tertiaryText)
                     .font(.title3)
             }
             
