@@ -53,9 +53,11 @@ struct ValuesRankingView: View {
                         .font(BrandTypography.subheadline)
                         .foregroundColor(BrandColors.secondaryText)
                         .multilineTextAlignment(.center)
-                        .padding(.horizontal, BrandSpacing.xxxl)
+                        .padding(.horizontal, ResponsiveLayout.horizontalPadding())
                 }
                 .padding(.top, BrandSpacing.xxxl)
+                .frame(maxWidth: ResponsiveLayout.maxContentWidth())
+                .padding(.horizontal, ResponsiveLayout.horizontalPadding())
                 
                 VStack(spacing: BrandSpacing.md) {
                     ForEach(Array(sortedValues.enumerated()), id: \.element.id) { index, valueRanking in
@@ -77,7 +79,8 @@ struct ValuesRankingView: View {
                     }
                     // Removed .onMove to disable drag and drop - only arrow buttons allowed
                 }
-                .padding(.horizontal, BrandSpacing.xl)
+                .padding(.horizontal, ResponsiveLayout.horizontalPadding())
+                .frame(maxWidth: ResponsiveLayout.maxContentWidth())
                 .id(refreshTrigger) // Force refresh when trigger changes
                 
                 Button(action: {
@@ -88,22 +91,23 @@ struct ValuesRankingView: View {
                 }) {
                     HStack(spacing: BrandSpacing.sm) {
                         Text("完成")
-                            .font(.system(size: 18, weight: .semibold))
+                            .font(.system(size: 18, weight: .bold))
                         Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 18, weight: .semibold))
+                            .font(.system(size: 18, weight: .bold))
                     }
-                    .foregroundColor(.white)
+                    .foregroundColor(BrandColors.invertedText) // Black text on white button
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, BrandSpacing.lg)
-                    .background(BrandColors.primaryGradient)
-                    .cornerRadius(16)
-                    .shadow(color: BrandColors.primaryBlue.opacity(0.4), radius: 15, x: 0, y: 8)
+                    .frame(height: 50)
+                    .background(BrandColors.primaryText) // White background
+                    .clipShape(Capsule()) // Pill shape
                 }
                 .buttonStyle(.plain)
-                .padding(.horizontal, BrandSpacing.xl)
+                .padding(.horizontal, ResponsiveLayout.horizontalPadding())
                 .padding(.bottom, BrandSpacing.xxxl)
+                .frame(maxWidth: ResponsiveLayout.maxContentWidth())
                 }
             }
+            .frame(maxWidth: .infinity)
         }
     }
     

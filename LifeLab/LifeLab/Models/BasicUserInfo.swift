@@ -1,6 +1,6 @@
 import Foundation
 
-struct BasicUserInfo: Codable {
+struct BasicUserInfo: Codable, Equatable {
     var region: String? // 居住地區
     var age: Int? // 年齡
     var name: String? // 稱呼

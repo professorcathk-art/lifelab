@@ -27,6 +27,43 @@ struct VennDiagramView: View {
         Array(Set(interests).intersection(Set(strengths)).intersection(Set(values)))
     }
     
+    // Theme-aware colors
+    private var interestColor: Color {
+        ThemeManager.shared.isDarkMode 
+            ? BrandColors.actionAccent // Purple in dark mode
+            : Color(hex: "E8D5FF") // Light purple pastel in day mode
+    }
+    
+    private var strengthColor: Color {
+        ThemeManager.shared.isDarkMode 
+            ? BrandColors.skyBlue // Blue in dark mode
+            : Color(hex: "D0E8FF") // Light blue pastel in day mode
+    }
+    
+    private var valueColor: Color {
+        ThemeManager.shared.isDarkMode 
+            ? BrandColors.brandAccent // Golden yellow in dark mode
+            : Color(hex: "FFF4D0") // Light yellow pastel in day mode
+    }
+    
+    private var interestStrokeColor: Color {
+        ThemeManager.shared.isDarkMode 
+            ? BrandColors.actionAccent
+            : Color(hex: "6B4EFF") // Periwinkle blue stroke
+    }
+    
+    private var strengthStrokeColor: Color {
+        ThemeManager.shared.isDarkMode 
+            ? BrandColors.skyBlue
+            : Color(hex: "60A5FA") // Sky blue stroke
+    }
+    
+    private var valueStrokeColor: Color {
+        ThemeManager.shared.isDarkMode 
+            ? BrandColors.brandAccent
+            : Color(hex: "F5A623") // Dawn gold stroke
+    }
+    
     var body: some View {
         VStack(spacing: BrandSpacing.lg) {
             GeometryReader { geometry in
@@ -34,38 +71,41 @@ struct VennDiagramView: View {
                 let centerY = geometry.size.height / 2
                 
                 ZStack {
-                    // Interest circle (left)
+                    // Interest circle (left) - Theme-aware
                     Circle()
-                        .fill(BrandColors.skyBlue.opacity(0.25))
+                        .fill(interestColor.opacity(ThemeManager.shared.isDarkMode ? 0.25 : 0.15)) // Pastel with opacity
                         .frame(width: circleRadius * 2, height: circleRadius * 2)
                         .position(x: centerX - centerOffset, y: centerY)
+                        .blendMode(ThemeManager.shared.isDarkMode ? .normal : .multiply) // Multiply blend in day mode
                         .overlay(
                             Circle()
-                                .stroke(BrandColors.skyBlue, lineWidth: 2.5)
+                                .stroke(interestStrokeColor, lineWidth: 2)
                                 .frame(width: circleRadius * 2, height: circleRadius * 2)
                                 .position(x: centerX - centerOffset, y: centerY)
                         )
                     
-                    // Strengths circle (top)
+                    // Strengths circle (top) - Theme-aware
                     Circle()
-                        .fill(BrandColors.accentTeal.opacity(0.25))
+                        .fill(strengthColor.opacity(ThemeManager.shared.isDarkMode ? 0.25 : 0.15))
                         .frame(width: circleRadius * 2, height: circleRadius * 2)
                         .position(x: centerX, y: centerY - centerOffset)
+                        .blendMode(ThemeManager.shared.isDarkMode ? .normal : .multiply)
                         .overlay(
                             Circle()
-                                .stroke(BrandColors.accentTeal, lineWidth: 2.5)
+                                .stroke(strengthStrokeColor, lineWidth: 2)
                                 .frame(width: circleRadius * 2, height: circleRadius * 2)
                                 .position(x: centerX, y: centerY - centerOffset)
                         )
                     
-                    // Values circle (right)
+                    // Values circle (right) - Theme-aware
                     Circle()
-                        .fill(BrandColors.accentPurple.opacity(0.25))
+                        .fill(valueColor.opacity(ThemeManager.shared.isDarkMode ? 0.25 : 0.15))
                         .frame(width: circleRadius * 2, height: circleRadius * 2)
                         .position(x: centerX + centerOffset, y: centerY)
+                        .blendMode(ThemeManager.shared.isDarkMode ? .normal : .multiply)
                         .overlay(
                             Circle()
-                                .stroke(BrandColors.accentPurple, lineWidth: 2.5)
+                                .stroke(valueStrokeColor, lineWidth: 2)
                                 .frame(width: circleRadius * 2, height: circleRadius * 2)
                                 .position(x: centerX + centerOffset, y: centerY)
                         )
@@ -75,7 +115,7 @@ struct VennDiagramView: View {
                     VStack(spacing: 2) {
                         Text("興趣")
                             .font(BrandTypography.caption)
-                            .foregroundColor(BrandColors.skyBlue)
+                            .foregroundColor(interestStrokeColor)
                             .fontWeight(.bold)
                         ForEach(interests.prefix(3), id: \.self) { keyword in
                             Text(keyword)
@@ -96,7 +136,7 @@ struct VennDiagramView: View {
                     VStack(spacing: 2) {
                         Text("天賦")
                             .font(BrandTypography.caption)
-                            .foregroundColor(BrandColors.accentTeal)
+                            .foregroundColor(strengthStrokeColor)
                             .fontWeight(.bold)
                         ForEach(strengths.prefix(3), id: \.self) { keyword in
                             Text(keyword)
@@ -117,7 +157,7 @@ struct VennDiagramView: View {
                     VStack(spacing: 2) {
                         Text("價值觀")
                             .font(BrandTypography.caption)
-                            .foregroundColor(BrandColors.accentPurple)
+                            .foregroundColor(valueStrokeColor)
                             .fontWeight(.bold)
                         ForEach(values.prefix(3), id: \.self) { keyword in
                             Text(keyword)
@@ -147,17 +187,21 @@ struct VennDiagramView: View {
                             }
                         }
                         .padding(4)
-                        .background(BrandColors.secondaryBackground.opacity(0.9))
+                        .background(
+                            ThemeManager.shared.isDarkMode 
+                                ? BrandColors.surface.opacity(0.9)
+                                : BrandColors.surface.opacity(0.95) // White background in day mode
+                        )
                         .cornerRadius(6)
                         .position(x: centerX - centerOffset/2, y: centerY - centerOffset/2)
                     }
                     
-                    // All overlap (center)
+                    // All overlap (center) - Theme-aware
                     if !allOverlap.isEmpty {
                         VStack(spacing: 1) {
                             Image(systemName: "sparkles")
                                 .font(.system(size: 8))
-                                .foregroundColor(BrandColors.accentYellow)
+                                .foregroundColor(BrandColors.brandAccent)
                             ForEach(allOverlap.prefix(1), id: \.self) { keyword in
                                 Text(keyword)
                                     .font(.system(size: 9))
@@ -167,7 +211,11 @@ struct VennDiagramView: View {
                             }
                         }
                         .padding(4)
-                        .background(BrandColors.accentYellow.opacity(0.2))
+                        .background(
+                            ThemeManager.shared.isDarkMode 
+                                ? BrandColors.surface.opacity(0.9)
+                                : BrandColors.surface.opacity(0.95) // White background in day mode
+                        )
                         .cornerRadius(6)
                         .position(x: centerX, y: centerY)
                     }
@@ -189,12 +237,18 @@ struct VennDiagramView: View {
                         .lineSpacing(6)
                 }
                 .padding(BrandSpacing.lg)
-                .background(BrandColors.secondaryBackground)
+                .background(BrandColors.surface)
                 .cornerRadius(BrandRadius.medium)
+                .shadow(
+                    color: BrandColors.cardShadow.color,
+                    radius: BrandColors.cardShadow.radius,
+                    x: BrandColors.cardShadow.x,
+                    y: BrandColors.cardShadow.y
+                )
                 .padding(.horizontal, BrandSpacing.xl)
             } else if isLoadingSummary {
                 ProgressView()
-                    .tint(BrandColors.primaryBlue)
+                    .tint(BrandColors.actionAccent)
             }
         }
         .onAppear {

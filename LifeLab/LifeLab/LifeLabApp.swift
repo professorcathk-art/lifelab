@@ -1,12 +1,18 @@
 import SwiftUI
 import Combine
+import UIKit
 
 @main
 struct LifeLabApp: App {
     @StateObject private var dataService = DataService.shared
     @StateObject private var authService = AuthService.shared
+    @StateObject private var themeManager = ThemeManager.shared
+    @Environment(\.scenePhase) private var scenePhase
     
     init() {
+        // Sync theme with system on app launch
+        ThemeManager.shared.syncWithSystemTheme()
+        
         // Initialize Resend API key securely
         // The key is loaded from Secrets.swift (gitignored) or UserDefaults
         // This ensures the key is not exposed in source code
@@ -39,9 +45,53 @@ struct LifeLabApp: App {
                 ContentView()
                     .environmentObject(dataService)
                     .environmentObject(authService)
+                    .environmentObject(themeManager)
+                    .preferredColorScheme(themeManager.isDarkMode ? .dark : .light)
+                    .onAppear {
+                        // Sync with system theme when view appears
+                        themeManager.syncWithSystemTheme()
+                    }
+                    .onOpenURL { url in
+                        // Handle Universal Links and custom URL schemes
+                        handleURL(url)
+                    }
             } else {
-                LoginView()
+                // Show WelcomeIntroView first, then LoginView
+                WelcomeIntroOrLoginView()
                     .environmentObject(authService)
+                    .environmentObject(themeManager)
+                    .preferredColorScheme(themeManager.isDarkMode ? .dark : .light)
+                    .onAppear {
+                        // Sync with system theme when view appears
+                        themeManager.syncWithSystemTheme()
+                    }
+                    .onOpenURL { url in
+                        // Handle Universal Links and custom URL schemes
+                        handleURL(url)
+                    }
+            }
+        }
+        .onChange(of: scenePhase) { newPhase in
+            if newPhase == .active {
+                // Sync with system theme when app becomes active
+                themeManager.syncWithSystemTheme()
+            }
+        }
+    }
+    
+    /// Handle Universal Links and custom URL schemes
+    private func handleURL(_ url: URL) {
+        print("🔗 App opened via URL: \(url.absoluteString)")
+        
+        // Handle email confirmation
+        if url.path.contains("/auth/confirm") || url.host == "auth" && url.path == "/confirm" {
+            print("✅ Email confirmation URL detected")
+            // Email is confirmed when user clicks the link
+            // Supabase handles the confirmation automatically
+            // We just need to refresh auth state
+            Task {
+                // Refresh authentication state to get confirmed status
+                // The user will be automatically logged in if email is confirmed
             }
         }
     }

@@ -4,34 +4,49 @@ struct ReviewInitialScanView: View {
     @Environment(\.dismiss) var dismiss
     @StateObject private var viewModel = InitialScanViewModel()
     @EnvironmentObject var dataService: DataService
+    @State private var showCancelAlert = false
+    @State private var hasUnsavedChanges = false
+    @State private var showSaveSuccessAlert = false
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header with reset option
+            // Header without reset button - Minimal margin
             HStack {
                 Button("取消") {
-                    dismiss()
+                    if hasUnsavedChanges {
+                        showCancelAlert = true
+                    } else {
+                        dismiss()
+                    }
                 }
-                .foregroundColor(.blue)
+                .foregroundColor(BrandColors.actionAccent)
+                .font(BrandTypography.body)
                 
                 Spacer()
                 
                 Text("檢視初步掃描")
-                    .font(.headline)
+                    .font(BrandTypography.headline)
+                    .foregroundColor(BrandColors.primaryText)
                 
                 Spacer()
                 
-                Button("重置") {
-                    resetInitialScan()
-                }
-                .foregroundColor(.red)
+                // Placeholder for balance
+                Color.clear
+                    .frame(width: 60)
             }
-            .padding()
-            .background(Color(.systemGray6))
+            .padding(.horizontal, ResponsiveLayout.horizontalPadding())
+            .padding(.vertical, 8) // Fixed small padding instead of BrandSpacing
+            .frame(height: 44) // Fixed height to prevent expansion
+            .background(BrandColors.surface)
+            .frame(maxWidth: ResponsiveLayout.maxContentWidth())
             
-            ProgressIndicator(step: viewModel.currentStep, onStepTap: { step in
-                viewModel.saveProgress()
-                viewModel.goToStep(step)
+            ReviewProgressIndicator(step: viewModel.currentStep, onStepTap: { step in
+                // Skip loading, payment, and blueprint steps in review mode
+                if step != .loading && step != .payment && step != .blueprint {
+                    // IMPORTANT: Save current changes before navigating
+                    saveChangesSilently()
+                    viewModel.goToStepReviewMode(step)
+                }
             })
             
             Group {
@@ -39,55 +54,75 @@ struct ReviewInitialScanView: View {
                 case .basicInfo:
                     BasicInfoView()
                         .environmentObject(viewModel)
+                        .onChange(of: viewModel.basicInfo) { _ in
+                            hasUnsavedChanges = true
+                        }
                 case .interests:
                     InterestsSelectionView()
                         .environmentObject(viewModel)
+                        .onChange(of: viewModel.selectedInterests) { _ in
+                            hasUnsavedChanges = true
+                        }
                 case .strengths:
                     StrengthsQuestionnaireView()
                         .environmentObject(viewModel)
+                        .onChange(of: viewModel.strengths) { _ in
+                            hasUnsavedChanges = true
+                        }
                 case .values:
                     ValuesRankingView()
                         .environmentObject(viewModel)
+                        .onChange(of: viewModel.selectedValues) { _ in
+                            hasUnsavedChanges = true
+                        }
                 case .aiSummary:
                     AISummaryView()
                         .environmentObject(viewModel)
-                case .loading:
-                    PlanGenerationLoadingView {
-                        viewModel.currentStep = .payment
-                    }
-                case .payment:
-                    PaymentView()
-                        .environmentObject(viewModel)
-                case .blueprint:
-                    LifeBlueprintView()
-                        .environmentObject(viewModel)
+                default:
+                    // Skip loading, payment, and blueprint steps in review mode
+                    EmptyView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             
-            // Navigation buttons - Hidden "上一步" and "下一步", users can use progress dots instead
-            // Only show "完成檢視" button on blueprint step
-            if viewModel.currentStep == .blueprint {
+            // Save button - show on all review steps (blueprint is removed from review mode)
+            if viewModel.currentStep != .blueprint && viewModel.currentStep != .loading && viewModel.currentStep != .payment {
                 HStack(spacing: 12) {
                     Button(action: {
-                        viewModel.saveProgress()
-                        dismiss()
+                        saveChanges()
                     }) {
-                        Text("完成檢視")
-                            .font(.subheadline)
-                            .foregroundColor(.white)
+                        Text("儲存變更")
+                            .font(BrandTypography.headline)
+                            .fontWeight(.bold)
+                            .foregroundColor(BrandColors.invertedText)
                             .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color(hex: "10b6cc"))
-                            .cornerRadius(12)
+                            .padding(.vertical, BrandSpacing.md)
+                            .background(BrandColors.actionAccent)
+                            .cornerRadius(BrandRadius.medium)
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 16)
+                .padding(.horizontal, ResponsiveLayout.horizontalPadding())
+                .padding(.bottom, BrandSpacing.lg)
+                .frame(maxWidth: ResponsiveLayout.maxContentWidth())
             }
         }
+        .frame(maxWidth: .infinity)
         .onAppear {
             loadCurrentData()
+        }
+        .alert("確認取消", isPresented: $showCancelAlert) {
+            Button("繼續編輯", role: .cancel) { }
+            Button("放棄變更", role: .destructive) {
+                hasUnsavedChanges = false
+                dismiss()
+            }
+        } message: {
+            Text("您有未儲存的變更。如果現在取消，所有變更將會遺失。建議您先儲存變更。")
+        }
+        .alert("變更已儲存", isPresented: $showSaveSuccessAlert) {
+            Button("確定", role: .cancel) { }
+        } message: {
+            Text("您的變更已成功儲存。")
         }
         .environmentObject(viewModel)
     }
@@ -111,41 +146,129 @@ struct ReviewInitialScanView: View {
             }
         }
         
-        // Set current step based on progress
-        if profile.lifeBlueprint != nil {
-            viewModel.lifeBlueprint = profile.lifeBlueprint
-            viewModel.currentStep = .blueprint
-        } else if !profile.values.isEmpty {
-            // If values exist but no blueprint, regenerate summary if needed
-            if viewModel.aiSummary.isEmpty {
-                viewModel.generateAISummary()
-            }
-            viewModel.currentStep = .aiSummary
-        } else if !profile.strengths.isEmpty {
-            if viewModel.selectedValues.isEmpty {
-                viewModel.initializeValues()
-            }
-            viewModel.currentStep = .values
-        } else if !profile.interests.isEmpty {
+        // IMPORTANT: Always restore existing data, don't reset
+        // Restore strengths data
+        if !profile.strengths.isEmpty {
+            // Initialize structure first if empty
             if viewModel.strengths.isEmpty {
                 viewModel.initializeStrengthsQuestions()
             }
-            viewModel.currentStep = .strengths
-        } else if profile.basicInfo != nil {
-            viewModel.currentStep = .interests
-        } else {
-            viewModel.currentStep = .basicInfo
+            // Restore selected keywords and answers from profile
+            for (index, strength) in profile.strengths.enumerated() {
+                if index < viewModel.strengths.count {
+                    viewModel.strengths[index].selectedKeywords = strength.selectedKeywords
+                    viewModel.strengths[index].userAnswer = strength.userAnswer
+                }
+            }
+        } else if viewModel.strengths.isEmpty {
+            viewModel.initializeStrengthsQuestions()
+        }
+        
+        // Restore values data
+        if !profile.values.isEmpty {
+            // Initialize structure first if empty
+            if viewModel.selectedValues.isEmpty {
+                viewModel.initializeValues()
+            }
+            // Restore values from profile
+            for profileValue in profile.values {
+                if let index = viewModel.selectedValues.firstIndex(where: { $0.value == profileValue.value }) {
+                    viewModel.selectedValues[index] = profileValue
+                }
+            }
+        } else if viewModel.selectedValues.isEmpty {
+            viewModel.initializeValues()
+        }
+        
+        // IMPORTANT: Always start from basicInfo for review - allow user to review all answers
+        viewModel.currentStep = .basicInfo
+        
+        // Load AI summary if it exists (but don't regenerate automatically)
+        if let existingSummary = profile.lifeBlueprint?.strengthsSummary {
+            viewModel.aiSummary = existingSummary
         }
     }
     
-    private func resetInitialScan() {
-        viewModel.resetInitialScan()
+    private func saveChanges() {
+        // Save all changes to user profile
+        saveChangesSilently()
+        
+        // Show success alert
+        showSaveSuccessAlert = true
+    }
+    
+    private func saveChangesSilently() {
+        // IMPORTANT: Save all current viewModel data to DataService
+        // This includes basicInfo which was missing before
         DataService.shared.updateUserProfile { profile in
-            profile.interests = []
-            profile.strengths = []
-            profile.values = []
-            profile.lifeBlueprint = nil
+            profile.basicInfo = viewModel.basicInfo
+            profile.interests = viewModel.selectedInterests
+            profile.strengths = viewModel.strengths
+            profile.values = viewModel.selectedValues
+            
+            // If AI summary was regenerated, update it
+            if !viewModel.aiSummary.isEmpty {
+                // AI summary is stored separately, update if needed
+            }
         }
+        
+        // Also call viewModel.saveProgress() for consistency
+        viewModel.saveProgress()
+        
+        hasUnsavedChanges = false
+    }
+}
+
+// MARK: - Review Progress Indicator (Skips loading and payment steps)
+struct ReviewProgressIndicator: View {
+    let step: InitialScanStep
+    var onStepTap: ((InitialScanStep) -> Void)?
+    
+    // Steps to show in review mode (skip loading, payment, and blueprint)
+    private let reviewSteps: [InitialScanStep] = [.basicInfo, .interests, .strengths, .values, .aiSummary]
+    
+    var body: some View {
+        HStack(spacing: BrandSpacing.sm) {
+            ForEach(reviewSteps, id: \.rawValue) { reviewStep in
+                Button(action: {
+                    onStepTap?(reviewStep)
+                }) {
+                    ZStack {
+                        // Outer circle - Purple for current/completed, dark gray for future
+                        Circle()
+                            .fill(isStepCompleted(reviewStep) ? BrandColors.actionAccent : BrandColors.surface)
+                            .frame(width: 12, height: 12)
+                        
+                        // Inner white dot for current/completed steps
+                        if isStepCompleted(reviewStep) {
+                            Circle()
+                                .fill(BrandColors.primaryText) // Pure white
+                                .frame(width: 6, height: 6)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.vertical, BrandSpacing.sm) // Reduced from lg to sm
+        .frame(maxWidth: .infinity)
+    }
+    
+    private func isStepCompleted(_ reviewStep: InitialScanStep) -> Bool {
+        // Map review steps to their raw values (accounting for skipped steps)
+        let stepMapping: [InitialScanStep: Int] = [
+            .basicInfo: 1,
+            .interests: 2,
+            .strengths: 3,
+            .values: 4,
+            .aiSummary: 5
+        ]
+        
+        if let currentStepValue = stepMapping[step],
+           let reviewStepValue = stepMapping[reviewStep] {
+            return currentStepValue >= reviewStepValue
+        }
+        return false
     }
 }
 

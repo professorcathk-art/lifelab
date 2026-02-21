@@ -5,9 +5,7 @@ struct InitialScanView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            ProgressIndicator(step: viewModel.currentStep, onStepTap: { step in
-                viewModel.goToStep(step)
-            })
+            ProgressIndicator(step: viewModel.currentStep)
             
             Group {
                 switch viewModel.currentStep {
@@ -45,39 +43,31 @@ struct InitialScanView: View {
 
 struct ProgressIndicator: View {
     let step: InitialScanStep
-    var onStepTap: ((InitialScanStep) -> Void)?
     
     var body: some View {
+        // NO background box - dots directly on pure black background
+        // DISABLED: Users cannot tap to jump between steps - must complete in order
         HStack(spacing: BrandSpacing.sm) {
             ForEach(1...8, id: \.self) { index in
-                Button(action: {
-                    if let targetStep = InitialScanStep(rawValue: index) {
-                        onStepTap?(targetStep)
-                    }
-                }) {
-                    ZStack {
+                ZStack {
+                    // Outer circle - Purple for current/completed, dark gray for future
+                    Circle()
+                        .fill(step.rawValue >= index ? BrandColors.actionAccent : BrandColors.surface)
+                        .frame(width: 12, height: 12)
+                    
+                    // Inner white dot for current/completed steps
+                    if step.rawValue >= index {
                         Circle()
-                            .fill(step.rawValue >= index ? BrandColors.primaryBlue : BrandColors.tertiaryBackground)
-                            .frame(width: 14, height: 14)
-                        
-                        if step.rawValue >= index {
-                            Circle()
-                                .fill(.white)
-                                .frame(width: 6, height: 6)
-                        }
+                            .fill(BrandColors.primaryText) // Pure white
+                            .frame(width: 6, height: 6)
                     }
                 }
-                .buttonStyle(.plain)
             }
         }
         .padding(.vertical, BrandSpacing.lg)
-        .padding(.horizontal, BrandSpacing.xl)
-        .background(
-            RoundedRectangle(cornerRadius: BrandRadius.medium)
-                .fill(BrandColors.secondaryBackground)
-                .shadow(color: BrandShadow.small.color, radius: BrandShadow.small.radius, x: BrandShadow.small.x, y: BrandShadow.small.y)
-        )
-        .padding(.horizontal, BrandSpacing.lg)
+        .frame(maxWidth: .infinity)
+        // NO background, NO shadow - clean dots on pure black
+        // NO tap interaction - users must complete steps in order
     }
 }
 

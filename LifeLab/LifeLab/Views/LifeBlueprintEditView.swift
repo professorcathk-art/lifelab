@@ -6,21 +6,28 @@ struct LifeBlueprintEditView: View {
     let blueprint: LifeBlueprint
     @State private var editedDirections: [EditableDirection]
     @State private var allVersionsDirections: [EditableDirection] = []
+    @State private var showDirectionChangeAlert = false
+    @State private var hasUnsavedChanges = false
+    @State private var showBackAlert = false
     
     init(blueprint: LifeBlueprint) {
         self.blueprint = blueprint
-        // Initialize with priority order (1, 2, 3...) if not set
-        var directions = blueprint.vocationDirections.map { EditableDirection(from: $0) }
-        for (index, _) in directions.enumerated() {
-            if directions[index].priority == 0 {
-                directions[index].priority = index + 1
-            }
+        // Initialize with original version and sequence number
+        var directions: [EditableDirection] = []
+        for (index, direction) in blueprint.vocationDirections.enumerated() {
+            var editable = EditableDirection(
+                from: direction,
+                version: blueprint.version,
+                sequenceNumber: index + 1
+            )
+            editable.priority = direction.priority > 0 ? direction.priority : index + 1
+            directions.append(editable)
         }
-        // Auto-set favorite as first priority
+        // Auto-set favorite as first priority (display order only)
         if let favoriteIndex = directions.firstIndex(where: { $0.isFavorite }) {
             var favorite = directions.remove(at: favoriteIndex)
             favorite.priority = 1
-            // Update other priorities
+            // Update other priorities (display order only)
             for i in directions.indices {
                 directions[i].priority = i + 2
             }
@@ -34,25 +41,31 @@ struct LifeBlueprintEditView: View {
         var title: String
         var description: String
         var marketFeasibility: String
-        var priority: Int
+        var priority: Int // Display priority (for sorting)
         var isFavorite: Bool
+        var originalVersion: Int // Original version number
+        var originalSequenceNumber: Int // Original sequence number within that version
         
-        init(id: UUID = UUID(), title: String = "", description: String = "", marketFeasibility: String = "", priority: Int = 0, isFavorite: Bool = false) {
+        init(id: UUID = UUID(), title: String = "", description: String = "", marketFeasibility: String = "", priority: Int = 0, isFavorite: Bool = false, originalVersion: Int = 1, originalSequenceNumber: Int = 1) {
             self.id = id
             self.title = title
             self.description = description
             self.marketFeasibility = marketFeasibility
             self.priority = priority
             self.isFavorite = isFavorite
+            self.originalVersion = originalVersion
+            self.originalSequenceNumber = originalSequenceNumber
         }
         
-        init(from direction: VocationDirection) {
+        init(from direction: VocationDirection, version: Int, sequenceNumber: Int) {
             self.id = direction.id
             self.title = direction.title
             self.description = direction.description
             self.marketFeasibility = direction.marketFeasibility
             self.priority = direction.priority
             self.isFavorite = direction.isFavorite
+            self.originalVersion = version
+            self.originalSequenceNumber = sequenceNumber
         }
         
         func toVocationDirection() -> VocationDirection {
@@ -79,92 +92,109 @@ struct LifeBlueprintEditView: View {
                             Text("保存")
                         }
                         .font(BrandTypography.subheadline)
-                        .foregroundColor(.white)
+                        .fontWeight(.bold)
+                        .foregroundColor(BrandColors.invertedText) // Black text on white button
                         .padding(.horizontal, BrandSpacing.md)
                         .padding(.vertical, BrandSpacing.sm)
-                        .background(BrandColors.primaryGradient)
-                        .cornerRadius(BrandRadius.small)
+                        .background(BrandColors.primaryText) // White background
+                        .clipShape(Capsule()) // Pill shape
                     }
                     .buttonStyle(.plain)
                 }
                 .padding(.top, BrandSpacing.xxxl)
-                .padding(.horizontal, BrandSpacing.lg)
+                .padding(.horizontal, ResponsiveLayout.horizontalPadding())
+                .frame(maxWidth: ResponsiveLayout.maxContentWidth())
                 
-                // Instructions
+                // Instructions - Simplified
                 VStack(alignment: .leading, spacing: BrandSpacing.sm) {
                     Text("提示：")
                         .font(BrandTypography.headline)
                         .foregroundColor(BrandColors.primaryText)
                     Text("• 點擊⭐標記可以設為最愛（只能選擇一個）")
-                    Text("• 最愛方向 = 當前行動方向，會自動設為第一優先順序")
-                    Text("• 點擊上下箭頭可以調整優先順序")
+                        .font(BrandTypography.subheadline)
+                        .fontWeight(.bold)
+                        .foregroundColor(BrandColors.actionAccent)
                 }
-                .font(BrandTypography.subheadline)
-                .foregroundColor(BrandColors.secondaryText)
                 .padding(BrandSpacing.md)
                 .background(BrandColors.secondaryBackground.opacity(0.5))
                 .cornerRadius(BrandRadius.medium)
+                .frame(maxWidth: ResponsiveLayout.maxContentWidth())
+                .padding(.horizontal, ResponsiveLayout.horizontalPadding())
                 
-                ForEach(editedDirections.sorted(by: { $0.priority < $1.priority }), id: \.id) { direction in
-                    let index = editedDirections.firstIndex(where: { $0.id == direction.id }) ?? 0
+                // Display all versions directions (using editedDirections which contains all versions)
+                let allVersionsDirs = loadAllVersionsDirections()
+                
+                // Sort: Favorite first, then by version (newest first), then by original sequence number
+                let sortedDirections = allVersionsDirs.sorted(by: { 
+                    // Favorite first
+                    if $0.isFavorite != $1.isFavorite {
+                        return $0.isFavorite
+                    }
+                    // Then by version (newest first)
+                    if $0.originalVersion != $1.originalVersion {
+                        return $0.originalVersion > $1.originalVersion
+                    }
+                    // Then by original sequence number
+                    return $0.originalSequenceNumber < $1.originalSequenceNumber
+                })
+                
+                ForEach(sortedDirections, id: \.id) { direction in
+                    // Find the index in editedDirections array (or use direction directly if not found)
+                    let editedIndex = editedDirections.firstIndex(where: { $0.id == direction.id })
+                    
+                    // Use direction from sorted list, but update editedDirections when user edits
                     VStack(alignment: .leading, spacing: BrandSpacing.md) {
                         HStack {
-                            Text("Version \(blueprint.version) 方向 \(direction.priority)")
+                            // Display: Version X 方向 Y (using original version and sequence number)
+                            Text("Version \(direction.originalVersion) 方向 \(direction.originalSequenceNumber)")
                                 .font(BrandTypography.headline)
                                 .foregroundColor(BrandColors.primaryText)
+                            
+                            // Show indicator if this is from a different version (but still editable)
+                            if direction.originalVersion != blueprint.version {
+                                Text("（歷史版本，可編輯）")
+                                    .font(BrandTypography.caption)
+                                    .foregroundColor(BrandColors.secondaryText)
+                            }
                             
                             Spacer()
                             
                             // Favorite button
                             Button(action: {
+                                hasUnsavedChanges = true
                                 let wasFavorite = direction.isFavorite
-                                // Only one can be favorite
+                                
+                                // Check if user already has an action plan and is changing favorite
+                                if !wasFavorite, let profile = dataService.userProfile, profile.actionPlan != nil {
+                                    // User is changing favorite direction - show alert
+                                    showDirectionChangeAlert = true
+                                }
+                                
+                                // Only one can be favorite (across all versions)
                                 for i in editedDirections.indices {
                                     editedDirections[i].isFavorite = (editedDirections[i].id == direction.id)
                                 }
-                                // Auto-update priority: favorite becomes priority 1
+                                
+                                // Update priority for display order (favorite moves to top)
+                                // But originalSequenceNumber remains unchanged
                                 if !wasFavorite {
-                                    let favoriteIndex = editedDirections.firstIndex(where: { $0.id == direction.id }) ?? 0
-                                    let oldPriority = editedDirections[favoriteIndex].priority
-                                    editedDirections[favoriteIndex].priority = 1
-                                    // Update other priorities
+                                    // Find the favorite direction and update its priority
+                                    if let favoriteIndex = editedDirections.firstIndex(where: { $0.id == direction.id }) {
+                                        editedDirections[favoriteIndex].priority = 0 // Set to 0 so it sorts first
+                                    }
+                                    // Update other priorities (increment by 1)
                                     for i in editedDirections.indices {
                                         if editedDirections[i].id != direction.id {
-                                            if editedDirections[i].priority < oldPriority {
-                                                editedDirections[i].priority += 1
-                                            }
+                                            editedDirections[i].priority += 1
                                         }
                                     }
                                 }
                             }) {
                                 Image(systemName: direction.isFavorite ? "star.fill" : "star")
-                                    .foregroundColor(direction.isFavorite ? .yellow : BrandColors.secondaryText)
+                                    .foregroundColor(direction.isFavorite ? BrandColors.brandAccent : BrandColors.secondaryText)
                                     .font(.title3)
                             }
                             .buttonStyle(.plain)
-                            
-                            // Priority controls
-                            VStack(spacing: BrandSpacing.xs) {
-                                Button(action: {
-                                    moveDirectionUp(at: index)
-                                }) {
-                                    Image(systemName: "chevron.up.circle")
-                                        .foregroundColor(index > 0 ? BrandColors.primaryBlue : BrandColors.secondaryText)
-                                        .font(.title3)
-                                }
-                                .buttonStyle(.plain)
-                                .disabled(index == 0)
-                                
-                                Button(action: {
-                                    moveDirectionDown(at: index)
-                                }) {
-                                    Image(systemName: "chevron.down.circle")
-                                        .foregroundColor(index < editedDirections.count - 1 ? BrandColors.primaryBlue : BrandColors.secondaryText)
-                                        .font(.title3)
-                                }
-                                .buttonStyle(.plain)
-                                .disabled(index == editedDirections.count - 1)
-                            }
                         }
                         
                         VStack(alignment: .leading, spacing: BrandSpacing.sm) {
@@ -173,8 +203,23 @@ struct LifeBlueprintEditView: View {
                                 .foregroundColor(BrandColors.secondaryText)
                             
                             TextField("職業方向標題", text: Binding(
-                                get: { direction.title },
-                                set: { editedDirections[index].title = $0 }
+                                get: { 
+                                    if let index = editedIndex {
+                                        return editedDirections[index].title
+                                    }
+                                    return direction.title
+                                },
+                                set: { newValue in
+                                    hasUnsavedChanges = true
+                                    if let index = editedIndex {
+                                        editedDirections[index].title = newValue
+                                    } else {
+                                        // Add to editedDirections if not found
+                                        var newDir = direction
+                                        newDir.title = newValue
+                                        editedDirections.append(newDir)
+                                    }
+                                }
                             ))
                             .textFieldStyle(.roundedBorder)
                             .font(BrandTypography.body)
@@ -186,8 +231,22 @@ struct LifeBlueprintEditView: View {
                                 .foregroundColor(BrandColors.secondaryText)
                             
                             TextField("詳細描述", text: Binding(
-                                get: { direction.description },
-                                set: { editedDirections[index].description = $0 }
+                                get: { 
+                                    if let index = editedIndex {
+                                        return editedDirections[index].description
+                                    }
+                                    return direction.description
+                                },
+                                set: { newValue in
+                                    hasUnsavedChanges = true
+                                    if let index = editedIndex {
+                                        editedDirections[index].description = newValue
+                                    } else {
+                                        var newDir = direction
+                                        newDir.description = newValue
+                                        editedDirections.append(newDir)
+                                    }
+                                }
                             ), axis: .vertical)
                             .textFieldStyle(.roundedBorder)
                             .font(BrandTypography.body)
@@ -200,8 +259,22 @@ struct LifeBlueprintEditView: View {
                                 .foregroundColor(BrandColors.secondaryText)
                             
                             TextField("市場可行性評估", text: Binding(
-                                get: { direction.marketFeasibility },
-                                set: { editedDirections[index].marketFeasibility = $0 }
+                                get: { 
+                                    if let index = editedIndex {
+                                        return editedDirections[index].marketFeasibility
+                                    }
+                                    return direction.marketFeasibility
+                                },
+                                set: { newValue in
+                                    hasUnsavedChanges = true
+                                    if let index = editedIndex {
+                                        editedDirections[index].marketFeasibility = newValue
+                                    } else {
+                                        var newDir = direction
+                                        newDir.marketFeasibility = newValue
+                                        editedDirections.append(newDir)
+                                    }
+                                }
                             ), axis: .vertical)
                             .textFieldStyle(.roundedBorder)
                             .font(BrandTypography.body)
@@ -212,129 +285,184 @@ struct LifeBlueprintEditView: View {
                     .background(BrandColors.secondaryBackground)
                     .cornerRadius(BrandRadius.medium)
                 }
+                .padding(.horizontal, ResponsiveLayout.horizontalPadding())
+                .frame(maxWidth: ResponsiveLayout.maxContentWidth())
                 
                 Button(action: {
-                    // Save edited blueprint with updated priorities
-                    var updatedBlueprint = blueprint
-                    // Update priorities based on current order
-                    let sortedDirections = editedDirections.sorted(by: { $0.priority < $1.priority })
-                    var finalDirections: [VocationDirection] = []
-                    for (index, dir) in sortedDirections.enumerated() {
-                        var direction = dir.toVocationDirection()
-                        direction.priority = index + 1
-                        finalDirections.append(direction)
-                    }
-                    updatedBlueprint.vocationDirections = finalDirections
-                    
-                    DataService.shared.updateUserProfile { profile in
-                        profile.lifeBlueprint = updatedBlueprint
-                        if let index = profile.lifeBlueprints.firstIndex(where: { $0.version == blueprint.version }) {
-                            profile.lifeBlueprints[index] = updatedBlueprint
-                        }
-                    }
-                    
-                    dismiss()
+                    saveChanges()
                 }) {
                     HStack(spacing: BrandSpacing.sm) {
                         Image(systemName: "checkmark")
                         Text("保存修改")
                     }
                     .font(BrandTypography.headline)
-                    .foregroundColor(.white)
+                    .fontWeight(.bold)
+                    .foregroundColor(BrandColors.invertedText) // Black text on white button
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, BrandSpacing.lg)
-                    .background(BrandColors.primaryGradient)
-                    .cornerRadius(BrandRadius.medium)
+                    .frame(height: 50)
+                    .background(BrandColors.primaryText) // White background
+                    .clipShape(Capsule()) // Pill shape
                 }
                 .buttonStyle(.plain)
-                .padding(.horizontal, BrandSpacing.xl)
+                .padding(.horizontal, ResponsiveLayout.horizontalPadding())
                 .padding(.bottom, BrandSpacing.xxxl)
+                .frame(maxWidth: ResponsiveLayout.maxContentWidth())
             }
-                .padding(.horizontal, BrandSpacing.lg)
+            .frame(maxWidth: .infinity)
         }
         .background(BrandColors.background)
         .navigationTitle("編輯生命藍圖")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: {
+                    if hasUnsavedChanges {
+                        showBackAlert = true
+                    } else {
+                        dismiss()
+                    }
+                }) {
+                    HStack(spacing: BrandSpacing.xs) {
+                        Image(systemName: "chevron.left")
+                        Text("返回")
+                    }
+                    .foregroundColor(BrandColors.actionAccent)
+                }
+            }
+        }
+        .alert("確認返回", isPresented: $showBackAlert) {
+            Button("繼續編輯", role: .cancel) { }
+            Button("放棄變更", role: .destructive) {
+                hasUnsavedChanges = false
+                dismiss()
+            }
+        } message: {
+            Text("您有未儲存的變更。如果現在返回，所有變更將會遺失。建議您先儲存變更。")
+        }
+        .alert("改變當前行動方向", isPresented: $showDirectionChangeAlert) {
+            Button("確定", role: .cancel) { }
+        } message: {
+            Text("您已改變當前行動方向。請注意，新的行動方向可能與現有的行動計劃不完全匹配。建議您重新檢視行動計劃，確保計劃與新的方向一致。")
+        }
         .onAppear {
-            loadAllVersionsDirections()
+            // Load all versions directions on first appear
+            if editedDirections.count == blueprint.vocationDirections.count {
+                // Only load if we haven't loaded all versions yet
+                let allVersionsDirs = loadAllVersionsDirections()
+                editedDirections = allVersionsDirs
+            }
         }
     }
     
-    private func loadAllVersionsDirections() {
-        guard let profile = dataService.userProfile else { return }
+    private func loadAllVersionsDirections() -> [EditableDirection] {
+        guard let profile = dataService.userProfile else { return editedDirections }
         
-        // Collect all directions from all versions
+        // Collect all directions from all versions with original version and sequence number
         var allDirections: [EditableDirection] = []
         
-        // Add directions from current blueprint
-        for direction in blueprint.vocationDirections {
-            allDirections.append(EditableDirection(from: direction))
-        }
-        
-        // Add directions from other versions (excluding current version)
+        // Add directions from all versions (including current)
         for versionBlueprint in profile.lifeBlueprints {
-            if versionBlueprint.version != blueprint.version {
-                for direction in versionBlueprint.vocationDirections {
-                    // Only add if not already in current directions
-                    if !allDirections.contains(where: { $0.id == direction.id }) {
-                        allDirections.append(EditableDirection(from: direction))
-                    }
+            for (index, direction) in versionBlueprint.vocationDirections.enumerated() {
+                // Check if this direction is already in editedDirections (user may have edited it)
+                if let editedDir = editedDirections.first(where: { $0.id == direction.id }) {
+                    // Use edited version but preserve original version and sequence number
+                    var updatedDir = editedDir
+                    updatedDir.originalVersion = versionBlueprint.version
+                    updatedDir.originalSequenceNumber = index + 1
+                    allDirections.append(updatedDir)
+                } else {
+                    // Add new direction with original version and sequence number
+                    allDirections.append(EditableDirection(
+                        from: direction,
+                        version: versionBlueprint.version,
+                        sequenceNumber: index + 1
+                    ))
                 }
             }
         }
         
-        // Update priorities
-        for (index, _) in allDirections.enumerated() {
-            if allDirections[index].priority == 0 {
-                allDirections[index].priority = index + 1
+        // Remove duplicates (keep the one with highest version number)
+        var uniqueDirections: [EditableDirection] = []
+        for direction in allDirections.reversed() {
+            if !uniqueDirections.contains(where: { $0.id == direction.id }) {
+                uniqueDirections.append(direction)
             }
         }
         
-        allVersionsDirections = allDirections
-        // Merge with editedDirections (current version takes precedence)
-        var mergedDirections = editedDirections
-        for versionDir in allVersionsDirections {
-            if !mergedDirections.contains(where: { $0.id == versionDir.id }) {
-                mergedDirections.append(versionDir)
-            }
-        }
-        editedDirections = mergedDirections
+        return uniqueDirections.reversed()
     }
     
     private func saveChanges() {
-        // Save current edited directions
-        var updatedBlueprint = blueprint
-        var finalDirections: [VocationDirection] = []
-        for (index, dir) in editedDirections.sorted(by: { $0.priority < $1.priority }).enumerated() {
-            var direction = dir.toVocationDirection()
-            direction.priority = index + 1
-            finalDirections.append(direction)
+        guard let profile = dataService.userProfile else {
+            dismiss()
+            return
         }
-        updatedBlueprint.vocationDirections = finalDirections
         
-        DataService.shared.updateUserProfile { profile in
-            profile.lifeBlueprint = updatedBlueprint
-            if let index = profile.lifeBlueprints.firstIndex(where: { $0.version == blueprint.version }) {
-                profile.lifeBlueprints[index] = updatedBlueprint
+        // Save all edited directions to their respective versions
+        var updatedBlueprints: [LifeBlueprint] = []
+        
+        // Group directions by their original version
+        let directionsByVersion = Dictionary(grouping: editedDirections) { $0.originalVersion }
+        
+        // Update each version's blueprint
+        for versionBlueprint in profile.lifeBlueprints {
+            var updatedBlueprint = versionBlueprint
+            
+            // Get directions for this version
+            if let versionDirections = directionsByVersion[versionBlueprint.version] {
+                // Sort by original sequence number to maintain order
+                let sortedDirections = versionDirections.sorted(by: { 
+                    // Favorite first, then by original sequence number
+                    if $0.isFavorite != $1.isFavorite {
+                        return $0.isFavorite
+                    }
+                    return $0.originalSequenceNumber < $1.originalSequenceNumber
+                })
+                
+                // Convert to VocationDirection and assign priorities
+                var finalDirections: [VocationDirection] = []
+                for (index, dir) in sortedDirections.enumerated() {
+                    var direction = dir.toVocationDirection()
+                    direction.priority = index + 1
+                    finalDirections.append(direction)
+                }
+                
+                updatedBlueprint.vocationDirections = finalDirections
             }
+            
+            updatedBlueprints.append(updatedBlueprint)
         }
         
+        // Update current blueprint (if it exists in the list)
+        var currentBlueprint = blueprint
+        if let currentVersionDirections = directionsByVersion[blueprint.version] {
+            let sortedDirections = currentVersionDirections.sorted(by: { 
+                if $0.isFavorite != $1.isFavorite {
+                    return $0.isFavorite
+                }
+                return $0.originalSequenceNumber < $1.originalSequenceNumber
+            })
+            
+            var finalDirections: [VocationDirection] = []
+            for (index, dir) in sortedDirections.enumerated() {
+                var direction = dir.toVocationDirection()
+                direction.priority = index + 1
+                finalDirections.append(direction)
+            }
+            
+            currentBlueprint.vocationDirections = finalDirections
+        }
+        
+        // Save all changes
+        DataService.shared.updateUserProfile { profile in
+            profile.lifeBlueprint = currentBlueprint
+            profile.lifeBlueprints = updatedBlueprints
+        }
+        
+        hasUnsavedChanges = false
         dismiss()
     }
     
-    private func moveDirectionUp(at index: Int) {
-        guard index > 0 else { return }
-        let tempPriority = editedDirections[index].priority
-        editedDirections[index].priority = editedDirections[index - 1].priority
-        editedDirections[index - 1].priority = tempPriority
-    }
-    
-    private func moveDirectionDown(at index: Int) {
-        guard index < editedDirections.count - 1 else { return }
-        let tempPriority = editedDirections[index].priority
-        editedDirections[index].priority = editedDirections[index + 1].priority
-        editedDirections[index + 1].priority = tempPriority
-    }
 }
 
 #Preview {

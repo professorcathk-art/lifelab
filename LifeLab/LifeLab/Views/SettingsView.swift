@@ -4,8 +4,11 @@ import UIKit
 struct SettingsView: View {
     @EnvironmentObject var dataService: DataService
     @EnvironmentObject var authService: AuthService
+    @StateObject private var themeManager = ThemeManager.shared
     @State private var showExportAlert = false
     @State private var showDeleteAlert = false
+    @State private var showDeleteAccountAlert = false
+    @State private var isDeletingAccount = false
     @State private var showFeedbackSheet = false
     @State private var feedbackText = ""
     @State private var isSubmittingFeedback = false
@@ -14,6 +17,21 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             List {
+                Section("外觀") {
+                    HStack {
+                        Label("主題模式", systemImage: themeManager.isDarkMode ? "moon.fill" : "sun.max.fill")
+                        Spacer()
+                        Button(action: {
+                            themeManager.toggleTheme()
+                        }) {
+                            Text(themeManager.isDarkMode ? "夜間模式" : "日間模式")
+                                .font(BrandTypography.subheadline)
+                                .foregroundColor(BrandColors.actionAccent)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                
                 Section("檢視與編輯") {
                     if dataService.userProfile?.lifeBlueprint != nil {
                         NavigationLink(destination: ReviewInitialScanView()) {
@@ -80,6 +98,14 @@ struct SettingsView: View {
                             Label("登出", systemImage: "arrow.right.square")
                                 .foregroundColor(.red)
                         }
+                        
+                        Button(action: {
+                            showDeleteAccountAlert = true
+                        }) {
+                            Label("刪除帳號", systemImage: "trash.fill")
+                                .foregroundColor(.red)
+                        }
+                        .disabled(isDeletingAccount)
                     }
                 }
             }
@@ -96,6 +122,16 @@ struct SettingsView: View {
                 }
             } message: {
                 Text("此操作無法復原，所有數據將被永久刪除")
+            }
+            .alert("確定要刪除帳號嗎？", isPresented: $showDeleteAccountAlert) {
+                Button("取消", role: .cancel) { }
+                Button("刪除", role: .destructive) {
+                    Task {
+                        await deleteAccount()
+                    }
+                }
+            } message: {
+                Text("刪除帳號將永久刪除您的所有數據，包括個人檔案、生命藍圖和行動計劃。此操作無法復原。")
             }
             .sheet(isPresented: $showFeedbackSheet) {
                 FeedbackView(
@@ -204,6 +240,34 @@ struct SettingsView: View {
     private func clearAllData() {
         DataService.shared.clearUserProfile()
     }
+    
+    private func deleteAccount() async {
+        isDeletingAccount = true
+        
+        do {
+            // Delete user data from Supabase
+            if let userId = authService.currentUser?.id {
+                try await SupabaseService.shared.deleteUserData(userId: userId)
+            }
+            
+            // Clear local data
+            await MainActor.run {
+                DataService.shared.clearUserProfile()
+                authService.signOut()
+            }
+            
+            print("✅ Account deleted successfully")
+        } catch {
+            await MainActor.run {
+                print("❌ Failed to delete account: \(error.localizedDescription)")
+                // Still clear local data even if Supabase deletion fails
+                DataService.shared.clearUserProfile()
+                authService.signOut()
+            }
+        }
+        
+        isDeletingAccount = false
+    }
 }
 
 struct FeedbackView: View {
@@ -221,8 +285,6 @@ struct FeedbackView: View {
                         .frame(minHeight: 200)
                 } header: {
                     Text("請分享您的意見和建議")
-                } footer: {
-                    Text("您的反饋將發送至 professor.cat.hk@gmail.com")
                 }
             }
             .navigationTitle("意見反饋")

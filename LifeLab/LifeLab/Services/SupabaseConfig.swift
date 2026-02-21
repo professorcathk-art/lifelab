@@ -6,26 +6,22 @@ import Foundation
 struct SupabaseConfig {
     static var projectURL: String {
         // First try to get from Secrets.swift (for development)
-        #if DEBUG
         if !Secrets.supabaseURL.isEmpty && Secrets.supabaseURL != "YOUR_SUPABASE_URL_HERE" {
             return Secrets.supabaseURL
         }
-        #endif
         
         // Fallback to UserDefaults (set during app initialization for production)
-        return UserDefaults.standard.string(forKey: "supabase_url") ?? ""
+        return UserDefaults.standard.string(forKey: "supabase_url") ?? "https://inlzhosqbccyynofbmjt.supabase.co"
     }
     
     static var anonKey: String {
         // First try to get from Secrets.swift (for development)
-        #if DEBUG
         if !Secrets.supabaseAnonKey.isEmpty && Secrets.supabaseAnonKey != "YOUR_SUPABASE_ANON_KEY_HERE" {
             return Secrets.supabaseAnonKey
         }
-        #endif
         
         // Fallback to UserDefaults (set during app initialization for production)
-        return UserDefaults.standard.string(forKey: "supabase_anon_key") ?? ""
+        return UserDefaults.standard.string(forKey: "supabase_anon_key") ?? "sb_publishable_IaUnj6C1mJGTHG8vXQmosg_oOz_uFk0"
     }
     
     static var serviceRoleKey: String {

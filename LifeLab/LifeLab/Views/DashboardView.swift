@@ -2,7 +2,7 @@ import SwiftUI
 
 struct DashboardView: View {
     @EnvironmentObject var dataService: DataService
-    @StateObject private var themeManager = ThemeManager.shared
+    @EnvironmentObject var themeManager: ThemeManager
     
     private func calculateInitialScanProgress() -> Double {
         guard let profile = dataService.userProfile else { return 0.0 }
@@ -41,25 +41,33 @@ struct DashboardView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: BrandSpacing.xxl) {
-                    // Header with gradient
+                    // Header - NO gradient, pure black background
                     VStack(spacing: BrandSpacing.sm) {
-                        Text("歡迎回來")
-                            .font(BrandTypography.title)
-                            .foregroundColor(BrandColors.primaryText)
+                        HStack(spacing: BrandSpacing.xs) {
+                            Text("歡迎回來")
+                                .font(BrandTypography.title)
+                                .foregroundColor(BrandColors.primaryText)
+                            
+                            if let userName = dataService.userProfile?.basicInfo?.name, !userName.isEmpty {
+                                Text(userName)
+                                    .font(BrandTypography.title)
+                                    .foregroundColor(BrandColors.actionAccent)
+                            }
+                        }
                         
                         Text("繼續您的天職探索之旅")
                             .font(BrandTypography.subheadline)
                             .foregroundColor(BrandColors.secondaryText)
                     }
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: ResponsiveLayout.maxContentWidth())
                     .padding(.vertical, BrandSpacing.xl)
-                    .background(BrandColors.primaryGradient.opacity(0.1))
+                    .padding(.horizontal, ResponsiveLayout.horizontalPadding())
                     
                     if let blueprint = dataService.userProfile?.lifeBlueprint {
                         VStack(alignment: .leading, spacing: BrandSpacing.lg) {
                             HStack {
                                 Image(systemName: "sparkles")
-                                    .foregroundColor(BrandColors.primaryBlue)
+                                    .foregroundColor(BrandColors.actionAccent) // Purple
                                 Text("您的生命藍圖")
                                     .font(BrandTypography.title2)
                                     .foregroundColor(BrandColors.primaryText)
@@ -70,9 +78,9 @@ struct DashboardView: View {
                                 NavigationLink(destination: LifeBlueprintEditView(blueprint: blueprint)) {
                                     Image(systemName: "pencil")
                                         .font(.title3)
-                                        .foregroundColor(BrandColors.primaryBlue)
+                                        .foregroundColor(BrandColors.actionAccent) // Purple
                                         .padding(BrandSpacing.sm)
-                                        .background(BrandColors.primaryBlue.opacity(0.1))
+                                        .background(BrandColors.actionAccent.opacity(0.1))
                                         .cornerRadius(BrandRadius.small)
                                 }
                                 .buttonStyle(.plain)
@@ -83,7 +91,7 @@ struct DashboardView: View {
                                 VStack(alignment: .leading, spacing: BrandSpacing.sm) {
                                     HStack {
                                         Image(systemName: "star.fill")
-                                            .foregroundColor(.yellow)
+                                            .foregroundColor(BrandColors.brandAccent) // Golden yellow
                                         Text("當前行動方向")
                                             .font(BrandTypography.subheadline)
                                             .foregroundColor(BrandColors.secondaryText)
@@ -100,8 +108,21 @@ struct DashboardView: View {
                                 }
                             }
                         }
-                        .brandCard()
-                        .padding(.horizontal, BrandSpacing.lg)
+                        .padding(BrandSpacing.lg)
+                        .background(BrandColors.surface)
+                        .cornerRadius(16)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(BrandColors.borderColor, lineWidth: 1)
+                        )
+                        .shadow(
+                            color: BrandColors.cardShadow.color,
+                            radius: BrandColors.cardShadow.radius,
+                            x: BrandColors.cardShadow.x,
+                            y: BrandColors.cardShadow.y
+                        )
+                        .padding(.horizontal, ResponsiveLayout.horizontalPadding())
+                        .frame(maxWidth: ResponsiveLayout.maxContentWidth())
                     }
                     
                     VStack(alignment: .leading, spacing: BrandSpacing.lg) {
@@ -112,17 +133,15 @@ struct DashboardView: View {
                             
                             Spacer()
                             
-                            // Dark mode toggle
+                            // Theme toggle button
                             Button(action: {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                    themeManager.isDarkMode.toggle()
-                                }
+                                themeManager.toggleTheme()
                             }) {
                                 Image(systemName: themeManager.isDarkMode ? "sun.max.fill" : "moon.fill")
                                     .font(.title3)
-                                    .foregroundColor(BrandColors.primaryBlue)
+                                    .foregroundColor(BrandColors.actionAccent)
                                     .padding(BrandSpacing.sm)
-                                    .background(BrandColors.primaryBlue.opacity(0.1))
+                                    .background(BrandColors.surface)
                                     .cornerRadius(BrandRadius.small)
                             }
                             .buttonStyle(.plain)
@@ -134,7 +153,7 @@ struct DashboardView: View {
                                         Text("重新檢視")
                                     }
                                     .font(BrandTypography.subheadline)
-                                    .foregroundColor(BrandColors.primaryBlue)
+                                    .foregroundColor(BrandColors.actionAccent) // Purple
                                 }
                             }
                         }
@@ -174,13 +193,24 @@ struct DashboardView: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    .brandCard()
-                    .padding(.horizontal, BrandSpacing.lg)
+                    .padding(BrandSpacing.lg)
+                    .background(BrandColors.surface)
+                    .cornerRadius(16)
+                    .shadow(
+                        color: BrandColors.cardShadow.color,
+                        radius: BrandColors.cardShadow.radius,
+                        x: BrandColors.cardShadow.x,
+                        y: BrandColors.cardShadow.y
+                    )
+                    .padding(.horizontal, ResponsiveLayout.horizontalPadding())
+                    .frame(maxWidth: ResponsiveLayout.maxContentWidth())
                 }
                 .padding(.vertical, BrandSpacing.lg)
+                .frame(maxWidth: .infinity)
             }
             .background(BrandColors.background)
             .navigationTitle("首頁")
+            .preferredColorScheme(themeManager.isDarkMode ? .dark : .light)
         }
     }
 }
@@ -204,7 +234,7 @@ struct ProgressCard: View {
                     .foregroundColor(BrandColors.primaryText)
                 Spacer()
                 Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
-                    .foregroundColor(isCompleted ? Color(hex: "10b6cc") : BrandColors.tertiaryText)
+                    .foregroundColor(isCompleted ? BrandColors.brandAccent : BrandColors.tertiaryText) // Golden yellow when completed
                     .font(.title3)
             }
             
@@ -212,11 +242,11 @@ struct ProgressCard: View {
                 GeometryReader { geometry in
                     ZStack(alignment: .leading) {
                         RoundedRectangle(cornerRadius: BrandRadius.small)
-                            .fill(BrandColors.tertiaryBackground)
+                            .fill(BrandColors.surface) // Track: Dark charcoal
                             .frame(height: 8)
                         
                         RoundedRectangle(cornerRadius: BrandRadius.small)
-                            .fill(BrandColors.primaryGradient)
+                            .fill(BrandColors.actionAccent) // Fill: Purple #8B5CF6
                             .frame(width: geometry.size.width * progress, height: 8)
                     }
                 }
@@ -228,7 +258,7 @@ struct ProgressCard: View {
             }
         }
         .padding(BrandSpacing.lg)
-        .background(BrandColors.secondaryBackground)
+        .background(BrandColors.surface) // #1C1C1E
         .cornerRadius(BrandRadius.medium)
     }
 }

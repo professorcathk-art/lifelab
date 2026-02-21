@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DeepeningExplorationView: View {
     @EnvironmentObject var dataService: DataService
+    @EnvironmentObject var themeManager: ThemeManager
     @State private var selectedStep: DeepeningExplorationStep?
     @State private var isGeneratingNewVersion = false
     @State private var isGeneratingActionPlan = false
@@ -38,16 +39,13 @@ struct DeepeningExplorationView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
-                    Text("深化探索")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                        .padding(.top, 32)
-                    
                     Text("完成以下練習以獲得完整的個人化計劃")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .font(BrandTypography.subheadline)
+                        .foregroundColor(BrandColors.secondaryText)
                         .multilineTextAlignment(.center)
-                        .padding(.horizontal, 32)
+                        .padding(.horizontal, ResponsiveLayout.horizontalPadding())
+                        .padding(.top, 32)
+                        .frame(maxWidth: ResponsiveLayout.maxContentWidth())
                     
                     explorationStepsView
                     
@@ -56,8 +54,11 @@ struct DeepeningExplorationView: View {
                     }
                 }
                 .padding(.bottom, 32)
+                .frame(maxWidth: .infinity)
             }
+            .background(BrandColors.background)
             .navigationTitle("深化探索")
+            .preferredColorScheme(themeManager.isDarkMode ? .dark : .light)
             .onAppear {
                 updateLatestVersionNumber()
                 updateCooldownStatus()
@@ -141,7 +142,7 @@ struct DeepeningExplorationView: View {
                 HStack(spacing: BrandSpacing.sm) {
                     if isGeneratingNewVersion {
                         ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .progressViewStyle(CircularProgressViewStyle(tint: BrandColors.invertedText))
                             .scaleEffect(0.8)
                     } else {
                         Image(systemName: "arrow.triangle.2.circlepath")
@@ -153,12 +154,23 @@ struct DeepeningExplorationView: View {
                     }
                 }
                 .font(BrandTypography.headline)
-                .foregroundColor(.white)
+                .foregroundColor(BrandColors.invertedText)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, BrandSpacing.lg)
-                .background(canGenerateBlueprint() ? AnyShapeStyle(BrandColors.primaryGradient) : AnyShapeStyle(BrandColors.secondaryBackground))
+                .background(
+                    canGenerateBlueprint() 
+                        ? (themeManager.isDarkMode 
+                            ? AnyShapeStyle(BrandColors.actionAccent)
+                            : AnyShapeStyle(BrandColors.actionAccent))
+                        : AnyShapeStyle(BrandColors.surface)
+                )
                 .cornerRadius(BrandRadius.medium)
-                .shadow(color: BrandColors.primaryBlue.opacity(0.3), radius: 8, x: 0, y: 4)
+                .shadow(
+                    color: canGenerateBlueprint() ? BrandColors.buttonShadow.color : Color.clear,
+                    radius: canGenerateBlueprint() ? BrandColors.buttonShadow.radius : 0,
+                    x: canGenerateBlueprint() ? BrandColors.buttonShadow.x : 0,
+                    y: canGenerateBlueprint() ? BrandColors.buttonShadow.y : 0
+                )
                 .scaleEffect(isGeneratingNewVersion ? 0.98 : 1.0)
                 .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isGeneratingNewVersion)
             }
@@ -173,32 +185,41 @@ struct DeepeningExplorationView: View {
                 }) {
                     VStack(spacing: BrandSpacing.sm) {
                         HStack(spacing: BrandSpacing.sm) {
-                            if isGeneratingActionPlan {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    .scaleEffect(0.8)
-                            } else if actionPlanGenerated {
-                                Image(systemName: "checkmark.circle.fill")
-                            } else {
-                                Image(systemName: "sparkles")
-                            }
+                        if isGeneratingActionPlan {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: BrandColors.invertedText))
+                                .scaleEffect(0.8)
+                        } else if actionPlanGenerated {
+                            Image(systemName: "checkmark.circle.fill")
+                        } else {
+                            Image(systemName: "sparkles")
+                        }
                             Text(isGeneratingActionPlan ? "正在生成..." : actionPlanGenerated ? "行動計劃已生成" : "生成行動計劃")
                         }
                         
                         if !isGeneratingActionPlan && !actionPlanGenerated {
                             Text("請先在編輯頁面選擇一個方向設為當前行動方向（⭐）")
                                 .font(BrandTypography.caption)
-                                .foregroundColor(.white.opacity(0.9))
+                                .foregroundColor(BrandColors.invertedText.opacity(0.9))
                                 .multilineTextAlignment(.center)
                         }
                     }
                     .font(BrandTypography.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(BrandColors.invertedText)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, BrandSpacing.lg)
-                    .background(actionPlanGenerated ? LinearGradient(colors: [Color(hex: "10b6cc"), Color(hex: "10b6cc").opacity(0.8)], startPoint: .leading, endPoint: .trailing) : BrandColors.primaryGradient)
+                    .background(
+                        actionPlanGenerated 
+                            ? AnyShapeStyle(BrandColors.success)
+                            : AnyShapeStyle(BrandColors.actionAccent)
+                    )
                     .cornerRadius(BrandRadius.medium)
-                    .shadow(color: BrandColors.primaryBlue.opacity(0.4), radius: 10, x: 0, y: 5)
+                    .shadow(
+                        color: BrandColors.buttonShadow.color,
+                        radius: BrandColors.buttonShadow.radius,
+                        x: BrandColors.buttonShadow.x,
+                        y: BrandColors.buttonShadow.y
+                    )
                     .scaleEffect(isGeneratingActionPlan ? 0.98 : 1.0)
                     .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isGeneratingActionPlan)
                 }
@@ -392,34 +413,44 @@ struct ExplorationStepCard: View {
     
     var body: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: BrandSpacing.sm) {
                 Text(title)
-                    .font(.headline)
+                    .font(BrandTypography.headline)
+                    .foregroundColor(BrandColors.primaryText)
                 Text(description)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .font(BrandTypography.subheadline)
+                    .foregroundColor(BrandColors.secondaryText)
             }
             
             Spacer()
             
             if isCompleted {
                 Image(systemName: "checkmark.circle.fill")
-                    .foregroundColor(Color(hex: "10b6cc"))
+                    .foregroundColor(BrandColors.success)
                     .font(.title2)
             } else if isUnlocked {
                 Image(systemName: "arrow.right.circle.fill")
-                    .foregroundColor(.blue)
+                    .foregroundColor(BrandColors.actionAccent)
                     .font(.title2)
             } else {
                 Image(systemName: "lock.fill")
-                    .foregroundColor(.gray)
+                    .foregroundColor(BrandColors.secondaryText)
                     .font(.title2)
             }
         }
         .padding(BrandSpacing.lg)
-        .background(BrandColors.secondaryBackground)
+        .background(BrandColors.surface)
         .cornerRadius(BrandRadius.medium)
-        .shadow(color: BrandShadow.small.color, radius: BrandShadow.small.radius, x: BrandShadow.small.x, y: BrandShadow.small.y)
+        .overlay(
+            RoundedRectangle(cornerRadius: BrandRadius.medium)
+                .stroke(BrandColors.borderColor, lineWidth: 1)
+        )
+        .shadow(
+            color: BrandColors.cardShadow.color,
+            radius: BrandColors.cardShadow.radius,
+            x: BrandColors.cardShadow.x,
+            y: BrandColors.cardShadow.y
+        )
         .opacity(isUnlocked ? 1.0 : 0.6)
     }
 }

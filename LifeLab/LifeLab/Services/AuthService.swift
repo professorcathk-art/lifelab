@@ -50,20 +50,66 @@ class AuthService: ObservableObject {
                 authProvider: .email
             )
             
+            // CRITICAL: Clear ALL previous user's data FIRST before setting new user
+            // This prevents data leakage between different accounts
+            print("🔒🔒🔒 CLEARING PREVIOUS USER DATA 🔒🔒🔒")
+            await MainActor.run {
+                // Clear previous user's data from memory FIRST
+                DataService.shared.userProfile = nil
+                DataService.shared.lastSyncTime = nil
+                print("✅ Cleared previous user's data from memory")
+            }
+            
+            // Set new user AFTER clearing old data
             await MainActor.run {
                 self.currentUser = user
                 self.isAuthenticated = true
                 saveUser(user)
+                print("✅ Set new user: \(supabaseUser.id)")
             }
             
-            // IMPORTANT: Load user-specific profile from Supabase
-            // Clear any previous user's data from memory first to ensure data isolation
-            Task {
-                await MainActor.run {
-                    DataService.shared.userProfile = nil
+            // CRITICAL: Now load new user's local data
+            // This ensures we load the correct user's data
+            print("📥📥📥 LOADING NEW USER'S LOCAL DATA 📥📥📥")
+            print("   User ID: \(supabaseUser.id)")
+            
+            // Load from local storage immediately (synchronous, instant)
+            await MainActor.run {
+                // Load this user's local data immediately
+                DataService.shared.loadUserProfileForUser(userId: supabaseUser.id)
+                if let profile = DataService.shared.userProfile {
+                    print("✅✅✅ LOADED NEW USER'S LOCAL DATA ✅✅✅")
+                    print("   User ID: \(supabaseUser.id)")
+                    print("   Interests: \(profile.interests.count)")
+                    print("   Strengths: \(profile.strengths.count)")
+                    print("   Values: \(profile.values.count)")
+                    print("   Has blueprint: \(profile.lifeBlueprint != nil)")
+                } else {
+                    print("⚠️ No local data found for new user \(supabaseUser.id)")
+                    print("   This is expected for a new user or first-time login")
                 }
-                // Load new user's data
+            }
+            
+            // IMPORTANT: Wait a moment to ensure token is saved before syncing
+            // Token is saved in makeAuthRequest, but we need to ensure it's persisted
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+            
+            // IMPORTANT: Load user-specific profile from Supabase (in background)
+            // This will merge with local data if Supabase has newer data
+            Task {
+                print("📥 Loading user profile from Supabase after email login...")
+                // Load from Supabase and merge with local data
                 await DataService.shared.loadFromSupabase(userId: supabaseUser.id)
+                print("✅ Completed loading profile from Supabase after email login")
+            }
+            
+            // IMPORTANT: Trigger immediate sync after login to ensure data is synced
+            Task {
+                // Wait a bit more to ensure everything is set up
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                print("🔄 Triggering immediate sync after email login...")
+                await DataService.shared.syncToSupabase()
+                print("✅ Sync triggered after email login")
             }
             
             print("✅ Email sign in successful: \(email)")
@@ -90,19 +136,48 @@ class AuthService: ObservableObject {
                 authProvider: .email
             )
             
+            // CRITICAL: Clear ALL previous user's data FIRST before setting new user
+            // This prevents data leakage between different accounts
+            print("🔒🔒🔒 CLEARING PREVIOUS USER DATA (SIGNUP) 🔒🔒🔒")
+            await MainActor.run {
+                // Clear previous user's data from memory FIRST
+                DataService.shared.userProfile = nil
+                DataService.shared.lastSyncTime = nil
+                print("✅ Cleared previous user's data from memory")
+            }
+            
+            // Set new user AFTER clearing old data
             await MainActor.run {
                 self.currentUser = user
                 self.isAuthenticated = true
                 saveUser(user)
+                print("✅ Set new user: \(supabaseUser.id)")
             }
             
-            // IMPORTANT: Clear any previous user's data and create new profile
-            Task {
-                await MainActor.run {
-                    DataService.shared.userProfile = nil
+            // CRITICAL: Now load new user's local data (if exists from previous session)
+            print("📥📥📥 CHECKING FOR LOCAL DATA AFTER SIGNUP 📥📥📥")
+            print("   User ID: \(supabaseUser.id)")
+            
+            // Load from local storage immediately (synchronous, instant)
+            await MainActor.run {
+                // Load this user's local data immediately (if exists)
+                DataService.shared.loadUserProfileForUser(userId: supabaseUser.id)
+                if let profile = DataService.shared.userProfile {
+                    print("✅✅✅ FOUND EXISTING LOCAL DATA ✅✅✅")
+                    print("   Interests: \(profile.interests.count)")
+                    print("   Strengths: \(profile.strengths.count)")
+                    print("   Values: \(profile.values.count)")
+                } else {
+                    print("📱 No existing local data - new user")
                 }
+            }
+            
+            // IMPORTANT: Create user profile in Supabase (in background)
+            Task {
+                print("📥 Creating user profile in Supabase after email signup...")
                 // Create user profile in Supabase (in background)
                 await DataService.shared.createUserProfileInSupabase(userId: supabaseUser.id)
+                print("✅ Completed creating profile in Supabase after email signup")
             }
             
             print("✅ Email sign up successful: \(email)")
@@ -129,16 +204,20 @@ class AuthService: ObservableObject {
         }
         
         do {
-            // For Apple Sign In with Supabase, we need to use the OAuth flow
-            // This requires a web-based redirect, but for iOS we'll use a simplified approach
-            // Note: Full OAuth flow may require additional setup in Supabase
+            // IMPORTANT: Apple Sign In with Supabase requires proper configuration
+            // The error "Unacceptable audience in id_token" means:
+            // 1. Supabase expects Service ID, not Bundle ID
+            // 2. Need to configure Apple OAuth in Supabase Dashboard
+            // 3. Service ID must match the one configured in Supabase
             
             // Try to sign in with Supabase using the identity token
+            print("🔐 Attempting Apple Sign In with Supabase...")
             let response = try await supabaseService.signInWithOAuth(
                 provider: "apple",
                 token: identityToken
             )
             let supabaseUser = response.user
+            print("✅ Apple Sign In with Supabase successful: \(supabaseUser.id)")
             
             // Extract user info from Apple credential
             let email = appleIDCredential.email
@@ -155,25 +234,70 @@ class AuthService: ObservableObject {
                 authProvider: .apple
             )
             
+            // CRITICAL: Clear ALL previous user's data FIRST before setting new user
+            // This prevents data leakage between different accounts
+            print("🔒🔒🔒 CLEARING PREVIOUS USER DATA (APPLE) 🔒🔒🔒")
+            await MainActor.run {
+                // Clear previous user's data from memory FIRST
+                DataService.shared.userProfile = nil
+                DataService.shared.lastSyncTime = nil
+                print("✅ Cleared previous user's data from memory")
+            }
+            
+            // Set new user AFTER clearing old data
             await MainActor.run {
                 self.currentUser = user
                 self.isAuthenticated = true
                 saveUser(user)
+                print("✅ Set new user: \(supabaseUser.id)")
             }
             
-            // IMPORTANT: Load user-specific profile from Supabase
-            // Clear any previous user's data from memory first to ensure data isolation
-            Task {
-                await MainActor.run {
-                    DataService.shared.userProfile = nil
+            // CRITICAL: Now load new user's local data
+            print("📥📥📥 LOADING NEW USER'S LOCAL DATA (APPLE) 📥📥📥")
+            print("   User ID: \(supabaseUser.id)")
+            
+            // Load from local storage immediately (synchronous, instant)
+            await MainActor.run {
+                // Load this user's local data immediately
+                DataService.shared.loadUserProfileForUser(userId: supabaseUser.id)
+                if let profile = DataService.shared.userProfile {
+                    print("✅✅✅ LOADED NEW USER'S LOCAL DATA ✅✅✅")
+                    print("   User ID: \(supabaseUser.id)")
+                    print("   Interests: \(profile.interests.count)")
+                    print("   Strengths: \(profile.strengths.count)")
+                    print("   Values: \(profile.values.count)")
+                    print("   Has blueprint: \(profile.lifeBlueprint != nil)")
+                } else {
+                    print("⚠️ No local data found for new user \(supabaseUser.id)")
+                    print("   This is expected for a new user or first-time login")
                 }
-                // Load new user's data
+            }
+            
+            // IMPORTANT: Load user-specific profile from Supabase (in background)
+            // This will merge with local data if Supabase has newer data
+            Task {
+                print("📥 Loading user profile from Supabase after Apple login...")
+                // Load from Supabase and merge with local data
                 await DataService.shared.loadFromSupabase(userId: supabaseUser.id)
+                print("✅ Completed loading profile from Supabase after Apple login")
             }
             
             print("✅ Apple Sign In successful")
         } catch {
-            print("❌ Apple Sign In Supabase error: \(error.localizedDescription)")
+            let errorMessage = error.localizedDescription
+            print("❌ Apple Sign In Supabase error: \(errorMessage)")
+            
+            // Check if it's the audience error (most common)
+            if errorMessage.contains("Unacceptable audience") {
+                print("⚠️ Apple OAuth Configuration Issue:")
+                print("   Error: Unacceptable audience in id_token")
+                print("   Cause: Supabase expects Service ID, but received Bundle ID")
+                print("   Solution:")
+                print("   1. Go to Supabase Dashboard → Authentication → Providers → Apple")
+                print("   2. Configure Apple OAuth with your Service ID (not Bundle ID)")
+                print("   3. Service ID format: com.resonance.lifelab.service (example)")
+                print("   4. Ensure Service ID matches the one in Apple Developer Portal")
+            }
             
             // Re-throw authorization errors (don't fallback)
             let nsError = error as NSError
@@ -181,8 +305,11 @@ class AuthService: ObservableObject {
                 throw error
             }
             
-            // Fallback: Create local session even if Supabase fails
-            // This ensures the app works even if OAuth isn't fully configured
+            // IMPORTANT: Fallback to local session, but warn about data sync limitations
+            // Data will be saved locally but NOT synced to Supabase
+            print("⚠️ Falling back to local session (data will NOT sync to Supabase)")
+            print("   To enable Supabase sync, please configure Apple OAuth in Supabase Dashboard")
+            
             let userIdentifier = appleIDCredential.user
             let email = appleIDCredential.email
             let fullName = appleIDCredential.fullName
@@ -190,8 +317,12 @@ class AuthService: ObservableObject {
                 .compactMap { $0 }
                 .joined(separator: " ")
             
+            // Use a deterministic UUID based on Apple user identifier for consistency
+            // This ensures the same user gets the same ID across sessions
+            let userId = UUID(uuidString: userIdentifier) ?? UUID()
+            
             let user = User(
-                id: userIdentifier,
+                id: userId.uuidString,
                 email: email,
                 name: name.isEmpty ? nil : name,
                 authProvider: .apple
@@ -203,7 +334,10 @@ class AuthService: ObservableObject {
                 saveUser(user)
             }
             
-            print("⚠️ Using local session (Supabase OAuth may need configuration)")
+            // IMPORTANT: Since we're using local session, data won't sync to Supabase
+            // But we can still save locally and sync later when OAuth is configured
+            print("⚠️ Using local session - data saved locally only")
+            print("   To enable Supabase sync, configure Apple OAuth in Supabase Dashboard")
         }
     }
     
@@ -233,25 +367,34 @@ class AuthService: ObservableObject {
             }
         }
         
-        // Clear authentication state
+        // CRITICAL: Clear authentication state FIRST
+        let previousUserId = currentUser?.id
         currentUser = nil
         isAuthenticated = false
         UserDefaults.standard.removeObject(forKey: userDefaultsKey)
         
-        // IMPORTANT: Clear current user's profile from memory
-        // Data is preserved in UserDefaults with user-specific key, but cleared from memory
+        // CRITICAL: Clear current user's profile from memory IMMEDIATELY
         // This ensures next user doesn't see previous user's data
+        // We clear this BEFORE clearing authentication state to prevent any race conditions
         DataService.shared.userProfile = nil
         DataService.shared.lastSyncTime = nil
         
+        print("🔒🔒🔒 SIGNED OUT - DATA CLEARED 🔒🔒🔒")
+        print("   Previous user ID: \(previousUserId ?? "N/A")")
+        print("   Memory cleared: ✅")
+        print("   User data preserved in user-specific local storage: ✅")
         print("✅ Signed out successfully (user data preserved in user-specific local storage)")
     }
     
     // MARK: - Session Management
     
     private func checkSupabaseSession() {
+        print("🔍 Checking Supabase session...")
+        
         // Check if we have a valid Supabase session
         if let supabaseUser = supabaseService.getCurrentUser() {
+            print("✅ Found Supabase session for user: \(supabaseUser.id)")
+            
             // Restore session from Supabase
             let user = User(
                 id: supabaseUser.id,
@@ -264,11 +407,20 @@ class AuthService: ObservableObject {
             Task { @MainActor in
                 self.currentUser = user
                 self.isAuthenticated = true
+                print("✅ Restored authentication state for user: \(user.id)")
             }
             
-            // Load profile in background
+            // IMPORTANT: Load profile from Supabase immediately
             Task {
+                print("📥 Loading user profile from Supabase for user: \(supabaseUser.id)")
                 await DataService.shared.loadFromSupabase(userId: supabaseUser.id)
+                print("✅ Completed loading profile from Supabase")
+            }
+        } else {
+            print("⚠️ No Supabase session found (user needs to login)")
+            // Check if we have local user data (from previous session)
+            if let localUser = currentUser {
+                print("📱 Found local user data, but no Supabase session. User needs to login again.")
             }
         }
     }

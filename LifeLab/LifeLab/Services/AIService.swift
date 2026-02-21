@@ -218,8 +218,10 @@ class AIService {
         let strengthsAnswers = profile.strengths.compactMap { $0.userAnswer }.filter { !$0.isEmpty }.joined(separator: "\n")
         let topValues = profile.values.sorted { $0.rank < $1.rank && !$0.isGreyedOut }.prefix(3).map { $0.value.rawValue }.joined(separator: "、")
         
-        // Build context with basic info
+        // Build context with ALL available user data
         var context = "用戶資料：\n"
+        
+        // Basic Info (基本資料)
         if let basicInfo = profile.basicInfo {
             if let region = basicInfo.region {
                 context += "- 居住地區：\(region)\n"
@@ -241,12 +243,86 @@ class AIService {
             }
             context += "\n"
         }
-        context += "- 興趣：\(interests)\n"
-        context += "- 天賦關鍵詞：\(strengths)\n"
+        
+        // Initial Scan Data (初步掃描資料)
+        context += "初步掃描資料：\n"
+        context += "- 興趣：\(interests.isEmpty ? "無" : interests)\n"
+        context += "- 天賦關鍵詞：\(strengths.isEmpty ? "無" : strengths)\n"
         if !strengthsAnswers.isEmpty {
             context += "- 天賦回答：\(strengthsAnswers)\n"
         }
-        context += "- 核心價值觀：\(topValues)\n"
+        context += "- 核心價值觀：\(topValues.isEmpty ? "無" : topValues)\n"
+        
+        // Deepening Exploration Data (深化探索資料)
+        if !profile.flowDiaryEntries.isEmpty {
+            let flowActivities = profile.flowDiaryEntries.filter { !$0.activity.isEmpty }.map { entry in
+                "\(entry.activity)（活力程度：\(entry.energyLevel)/10）"
+            }.joined(separator: "、")
+            if !flowActivities.isEmpty {
+                context += "\n心流日記：\n"
+                context += "- 心流事件：\(flowActivities)\n"
+            }
+        }
+        
+        if let valuesQ = profile.valuesQuestions {
+            var valuesContext = ""
+            if let admired = valuesQ.admiredPeople, !admired.isEmpty {
+                valuesContext += "- 欣賞的人：\(admired)\n"
+            }
+            if let characters = valuesQ.favoriteCharacters, !characters.isEmpty {
+                valuesContext += "- 喜歡的角色：\(characters)\n"
+            }
+            if let idealChild = valuesQ.idealChild, !idealChild.isEmpty {
+                valuesContext += "- 理想的孩子特質：\(idealChild)\n"
+            }
+            if let legacy = valuesQ.legacyDescription, !legacy.isEmpty {
+                valuesContext += "- 希望留下的遺產：\(legacy)\n"
+            }
+            if !valuesQ.reflectionAnswers.isEmpty {
+                let reflectionText = valuesQ.reflectionAnswers.filter { !$0.answer.isEmpty }.map { "\($0.question)：\($0.answer)" }.joined(separator: "\n")
+                if !reflectionText.isEmpty {
+                    valuesContext += "- 價值觀反思：\n\(reflectionText)\n"
+                }
+            }
+            if !valuesContext.isEmpty {
+                context += "\n價值觀深度探索：\n\(valuesContext)"
+            }
+        }
+        
+        if let resources = profile.resourceInventory {
+            var resourcesContext = ""
+            if let time = resources.time, !time.isEmpty { resourcesContext += "- 時間資源：\(time)\n" }
+            if let money = resources.money, !money.isEmpty { resourcesContext += "- 金錢資源：\(money)\n" }
+            if let items = resources.items, !items.isEmpty { resourcesContext += "- 物品資源：\(items)\n" }
+            if let network = resources.network, !network.isEmpty { resourcesContext += "- 人脈資源：\(network)\n" }
+            if !resourcesContext.isEmpty {
+                context += "\n資源盤點：\n\(resourcesContext)"
+            }
+        }
+        
+        if let acquired = profile.acquiredStrengths {
+            var strengthsContext = ""
+            if let exp = acquired.experience, !exp.isEmpty { strengthsContext += "- 經驗：\(exp)\n" }
+            if let knowledge = acquired.knowledge, !knowledge.isEmpty { strengthsContext += "- 知識：\(knowledge)\n" }
+            if let skills = acquired.skills, !skills.isEmpty { strengthsContext += "- 技能：\(skills)\n" }
+            if let achievements = acquired.achievements, !achievements.isEmpty { strengthsContext += "- 實績：\(achievements)\n" }
+            if !strengthsContext.isEmpty {
+                context += "\n後天強項：\n\(strengthsContext)"
+            }
+        }
+        
+        if let feasibility = profile.feasibilityAssessment {
+            var feasibilityContext = ""
+            if let p1 = feasibility.path1, !p1.isEmpty { feasibilityContext += "- 路徑1：\(p1)\n" }
+            if let p2 = feasibility.path2, !p2.isEmpty { feasibilityContext += "- 路徑2：\(p2)\n" }
+            if let p3 = feasibility.path3, !p3.isEmpty { feasibilityContext += "- 路徑3：\(p3)\n" }
+            if let p4 = feasibility.path4, !p4.isEmpty { feasibilityContext += "- 路徑4：\(p4)\n" }
+            if let p5 = feasibility.path5, !p5.isEmpty { feasibilityContext += "- 路徑5：\(p5)\n" }
+            if let p6 = feasibility.path6, !p6.isEmpty { feasibilityContext += "- 路徑6：\(p6)\n" }
+            if !feasibilityContext.isEmpty {
+                context += "\n可行性評估：\n\(feasibilityContext)"
+            }
+        }
         
         let prompt = """
         你是一位專業的職業規劃顧問。請根據以下用戶資料，生成一份深度、專業且符合現實的職業發展建議（生命藍圖）。
@@ -286,13 +362,19 @@ class AIService {
            - 考慮用戶的居住地區（提供當地真實市場數據和例子）
            - 例如：如果用戶在香港，提供香港本地市場的真實數據和例子（如：香港餐飲業平均薪資、市場規模等）
         
-        2. 每個方向的marketFeasibility必須包含具體信息，且使用USD美元為單位：
-           - "當前市場需求：高（餐飲創新領域年增長率15%，高端餐廳市場規模達XX億USD）"
-           - "未來趨勢：持續增長（消費者對體驗式餐飲需求上升）"
-           - "薪資範圍：主廚年薪80,000-150,000 USD（currency: USD），餐廳經營者年收入200,000-500,000 USD（currency: USD）"
-           - "競爭程度：中等（需要獨特定位和技術優勢）"
-           - "進入門檻：需要餐飲經驗和創新能力，建議先從副主廚開始"
-           - 如果用戶提供了居住地區，請提供該地區的真實市場數據和例子
+        2. 每個方向的marketFeasibility必須包含具體信息，且必須使用用戶居住地的貨幣和市場背景：
+           - **貨幣使用**：如果用戶居住在香港，使用港幣(HKD)；如果在台灣，使用台幣(TWD)；如果在中國大陸，使用人民幣(CNY)；如果在其他地區，使用該地區的當地貨幣。絕對不要統一使用USD，必須根據用戶的居住地區使用當地貨幣。
+           - **個人化市場分析**：
+             * 考慮用戶的目前收入水平（如果提供）：例如，如果用戶目前年薪50,000 USD，建議的方向應該考慮這個收入水平，提供合理的薪資範圍和成長路徑
+             * 考慮用戶的學歷背景：例如，如果用戶只有高中學歷，建議的方向應該考慮實際的進入門檻和學習路徑
+             * 考慮用戶的年齡：例如，如果用戶已經40歲，建議的方向應該考慮職業轉換的現實性和時間成本
+           - **市場可行性內容**（不要focus on市場規模，因為這對個人不相關）：
+             * "當前市場需求：高/中/低（說明為什麼，例如：該地區對XX人才需求旺盛/穩定/有限）"
+             * "未來趨勢：持續增長/穩定/下降（說明原因，例如：該地區XX產業正在發展/成熟/轉型）"
+             * "薪資範圍：根據用戶居住地區和目前收入，提供合理的薪資範圍（使用當地貨幣，例如：香港主廚年薪300,000-600,000 HKD，台灣主廚年薪800,000-1,500,000 TWD）"
+             * "競爭程度：高/中/低（說明原因，例如：該地區XX領域競爭激烈/中等/較少）"
+             * "進入門檻：具體說明需要什麼技能、經驗、證照等，以及如何開始（考慮用戶的學歷和背景）"
+           - **當地實際例子**：如果用戶提供了居住地區，必須提供該地區的真實知名例子或參考案例（例如：如果用戶在香港，可以提到香港本地的知名餐廳、企業或成功案例；如果在台灣，提到台灣本地的例子）。這些例子必須是真實存在的，不能虛構。
         
         3. 必須明確結合用戶的核心價值觀（\(topValues)），確保職業方向與價值觀高度一致
         
@@ -725,16 +807,48 @@ class AIService {
     }
     
     func generateActionPlan(profile: UserProfile, favoriteDirection: VocationDirection? = nil) async throws -> ActionPlan {
-        // Build context from user profile
+        // Build context from ALL available user data
         let interests = profile.interests.joined(separator: "、")
         let strengths = profile.strengths.flatMap { $0.selectedKeywords }.joined(separator: "、")
+        let strengthsAnswers = profile.strengths.compactMap { $0.userAnswer }.filter { !$0.isEmpty }.joined(separator: "\n")
         let topValues = profile.values.sorted { $0.rank < $1.rank && !$0.isGreyedOut }.prefix(3).map { $0.value.rawValue }.joined(separator: "、")
         
         var context = "用戶資料：\n"
-        context += "- 興趣：\(interests)\n"
-        context += "- 天賦：\(strengths)\n"
-        context += "- 價值觀：\(topValues)\n"
         
+        // Basic Info (基本資料) - Enhanced for personalized action plan
+        if let basicInfo = profile.basicInfo {
+            var basicInfoContext = "基本資料（用於個人化行動計劃）：\n"
+            if let region = basicInfo.region {
+                basicInfoContext += "- 居住地區：\(region)（請考慮該地區的資源和機會）\n"
+            }
+            if let age = basicInfo.age {
+                basicInfoContext += "- 年齡：\(age)歲（請考慮年齡對行動計劃時間表的影響）\n"
+            }
+            if let occupation = basicInfo.occupation {
+                basicInfoContext += "- 目前職業：\(occupation)（請考慮現有職業背景對轉換的影響）\n"
+            }
+            if let salary = basicInfo.annualSalaryUSD {
+                basicInfoContext += "- 目前年薪：\(salary) USD（請考慮此收入水平，提供合理的資源規劃）\n"
+            }
+            if let familyStatus = basicInfo.familyStatus {
+                basicInfoContext += "- 家庭狀況：\(familyStatus.rawValue)（請考慮家庭責任對時間和資源的影響）\n"
+            }
+            if let education = basicInfo.education {
+                basicInfoContext += "- 學歷：\(education.rawValue)（請考慮學歷背景對學習路徑的影響）\n"
+            }
+            context += basicInfoContext + "\n"
+        }
+        
+        // Initial Scan Data (初步掃描資料)
+        context += "初步掃描資料：\n"
+        context += "- 興趣：\(interests.isEmpty ? "無" : interests)\n"
+        context += "- 天賦：\(strengths.isEmpty ? "無" : strengths)\n"
+        if !strengthsAnswers.isEmpty {
+            context += "- 天賦回答：\(strengthsAnswers)\n"
+        }
+        context += "- 價值觀：\(topValues.isEmpty ? "無" : topValues)\n"
+        
+        // Life Blueprint Directions (生命藍圖方向)
         if let blueprint = profile.lifeBlueprint {
             context += "\n生命藍圖方向：\n"
             // If favorite direction is provided, prioritize it
@@ -753,45 +867,117 @@ class AIService {
             }
         }
         
-        if let flowDiary = profile.flowDiaryEntries.first(where: { !$0.activity.isEmpty }) {
-            context += "\n心流事件：\(flowDiary.activity)\n"
+        // Deepening Exploration Data (深化探索資料)
+        if !profile.flowDiaryEntries.isEmpty {
+            let flowActivities = profile.flowDiaryEntries.filter { !$0.activity.isEmpty }.map { entry in
+                "\(entry.activity)（活力程度：\(entry.energyLevel)/10）"
+            }.joined(separator: "、")
+            if !flowActivities.isEmpty {
+                context += "\n心流日記：\n"
+                context += "- 心流事件：\(flowActivities)\n"
+            }
+        }
+        
+        if let valuesQ = profile.valuesQuestions {
+            var valuesContext = ""
+            if let admired = valuesQ.admiredPeople, !admired.isEmpty {
+                valuesContext += "- 欣賞的人：\(admired)\n"
+            }
+            if let characters = valuesQ.favoriteCharacters, !characters.isEmpty {
+                valuesContext += "- 喜歡的角色：\(characters)\n"
+            }
+            if let idealChild = valuesQ.idealChild, !idealChild.isEmpty {
+                valuesContext += "- 理想的孩子特質：\(idealChild)\n"
+            }
+            if let legacy = valuesQ.legacyDescription, !legacy.isEmpty {
+                valuesContext += "- 希望留下的遺產：\(legacy)\n"
+            }
+            if !valuesQ.reflectionAnswers.isEmpty {
+                let reflectionText = valuesQ.reflectionAnswers.filter { !$0.answer.isEmpty }.map { "\($0.question)：\($0.answer)" }.joined(separator: "\n")
+                if !reflectionText.isEmpty {
+                    valuesContext += "- 價值觀反思：\n\(reflectionText)\n"
+                }
+            }
+            if !valuesContext.isEmpty {
+                context += "\n價值觀深度探索：\n\(valuesContext)"
+            }
         }
         
         if let resources = profile.resourceInventory {
-            context += "\n資源盤點：\n"
-            if let time = resources.time { context += "- 時間：\(time)\n" }
-            if let money = resources.money { context += "- 金錢：\(money)\n" }
+            var resourcesContext = ""
+            if let time = resources.time, !time.isEmpty { resourcesContext += "- 時間：\(time)\n" }
+            if let money = resources.money, !money.isEmpty { resourcesContext += "- 金錢：\(money)\n" }
+            if let items = resources.items, !items.isEmpty { resourcesContext += "- 物品：\(items)\n" }
+            if let network = resources.network, !network.isEmpty { resourcesContext += "- 人脈：\(network)\n" }
+            if !resourcesContext.isEmpty {
+                context += "\n資源盤點：\n\(resourcesContext)"
+            }
+        }
+        
+        if let acquired = profile.acquiredStrengths {
+            var strengthsContext = ""
+            if let exp = acquired.experience, !exp.isEmpty { strengthsContext += "- 經驗：\(exp)\n" }
+            if let knowledge = acquired.knowledge, !knowledge.isEmpty { strengthsContext += "- 知識：\(knowledge)\n" }
+            if let skills = acquired.skills, !skills.isEmpty { strengthsContext += "- 技能：\(skills)\n" }
+            if let achievements = acquired.achievements, !achievements.isEmpty { strengthsContext += "- 實績：\(achievements)\n" }
+            if !strengthsContext.isEmpty {
+                context += "\n後天強項：\n\(strengthsContext)"
+            }
+        }
+        
+        if let feasibility = profile.feasibilityAssessment {
+            var feasibilityContext = ""
+            if let p1 = feasibility.path1, !p1.isEmpty { feasibilityContext += "- 路徑1：\(p1)\n" }
+            if let p2 = feasibility.path2, !p2.isEmpty { feasibilityContext += "- 路徑2：\(p2)\n" }
+            if let p3 = feasibility.path3, !p3.isEmpty { feasibilityContext += "- 路徑3：\(p3)\n" }
+            if let p4 = feasibility.path4, !p4.isEmpty { feasibilityContext += "- 路徑4：\(p4)\n" }
+            if let p5 = feasibility.path5, !p5.isEmpty { feasibilityContext += "- 路徑5：\(p5)\n" }
+            if let p6 = feasibility.path6, !p6.isEmpty { feasibilityContext += "- 路徑6：\(p6)\n" }
+            if !feasibilityContext.isEmpty {
+                context += "\n可行性評估：\n\(feasibilityContext)"
+            }
         }
         
         let prompt = """
-        請根據以下用戶資料，生成一份詳細的行動計劃。請以JSON格式回應，格式如下：
+        你是一位專業的職業教練和行動計劃顧問。請根據以下用戶資料，生成一份詳細、可執行且個人化的行動計劃。
+        
+        ⚠️ 重要要求：
+        1. **個人化建議**：必須根據用戶的居住地區、目前收入、學歷、年齡、家庭狀況等基本資料，提供符合其現實狀況的行動計劃
+        2. **市場參照例子**（如果適用且可用）：
+           - 如果方向涉及轉行：可以提供一個市場上真實存在的名人轉行參考例子（例如：從工程師轉行成為作家的例子，必須是真實存在的）
+           - 如果方向涉及創業：可以提供一個市場上真實存在的參考產品或公司例子（例如：類似的成功創業案例，必須是真實存在的）
+           - 如果方向涉及技能學習：可以提供該領域的知名課程、認證或學習路徑參考
+           - **重要**：所有參照例子必須是真實存在的，不能虛構。如果不確定，寧可不提供例子，也不要提供虛假信息。
+        3. **可執行性**：每個任務必須具體、可執行，考慮用戶的現實條件（時間、資源、背景等）
+        
+        請以JSON格式回應，格式如下：
         
         {
           "shortTerm": [
             {
-              "title": "任務標題",
-              "description": "任務描述",
+              "title": "任務標題（具體可執行）",
+              "description": "任務描述（詳細說明如何執行，如果適用，可以提及市場參照例子）",
               "dueDate": "YYYY-MM-DD"
             }
           ],
           "midTerm": [
             {
               "title": "任務標題",
-              "description": "任務描述",
+              "description": "任務描述（如果適用，可以提及市場參照例子）",
               "dueDate": "YYYY-MM-DD"
             }
           ],
           "longTerm": [
             {
               "title": "任務標題",
-              "description": "任務描述",
+              "description": "任務描述（如果適用，可以提及市場參照例子）",
               "dueDate": "YYYY-MM-DD"
             }
           ],
           "milestones": [
             {
               "title": "里程碑標題",
-              "description": "里程碑描述",
+              "description": "里程碑描述（如果適用，可以提及市場參照例子）",
               "targetDate": "YYYY-MM-DD",
               "successIndicators": ["指標1", "指標2"]
             }
@@ -801,12 +987,16 @@ class AIService {
         \(context)
         
         請生成：
-        - 短期目標（1-3個月）：2-3個具體可執行的任務
-        - 中期目標（3-6個月）：2-3個任務
-        - 長期目標（6-12個月）：1-2個任務
-        - 關鍵里程碑：2-3個里程碑，每個包含成功指標
+        - 短期目標（1-3個月）：2-3個具體可執行的任務，考慮用戶的現有資源和背景
+        - 中期目標（3-6個月）：2-3個任務，逐步推進長期目標
+        - 長期目標（6-12個月）：1-2個任務，達成職業轉換或發展目標
+        - 關鍵里程碑：2-3個里程碑，每個包含成功指標，幫助用戶追蹤進度
         
         所有日期請使用未來日期（從今天開始計算）。使用繁體中文，只返回JSON，不要其他文字。
+        
+        **市場參照例子格式**（如果適用）：
+        - 在任務描述中，可以這樣提及："參考例子：XX（真實存在的名人/公司/產品）從XX轉行/創業/學習XX的成功經驗"
+        - 必須確保所有例子都是真實存在的，不能虛構
         """
         
         let messages: [[String: Any]] = [
@@ -937,15 +1127,28 @@ class AIService {
             throw NSError(domain: "AIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "No action plan found"])
         }
         
-        // Build context from short-term and mid-term goals
+        // IMPORTANT: Filter out completed tasks and consider completed today tasks
+        let completedTodayTaskTitles = actionPlan.todayTasks.filter { $0.isCompleted }.map { $0.title }
+        
+        // Build context from short-term and mid-term goals (excluding completed ones)
         var context = "用戶的短期目標（1-3個月）：\n"
-        for (index, task) in actionPlan.shortTerm.prefix(3).enumerated() {
+        let incompleteShortTerm = actionPlan.shortTerm.filter { !$0.isCompleted }
+        for (index, task) in incompleteShortTerm.prefix(3).enumerated() {
             context += "\(index + 1). \(task.title): \(task.description)\n"
         }
         
         context += "\n用戶的中期目標（3-6個月）：\n"
-        for (index, task) in actionPlan.midTerm.prefix(2).enumerated() {
+        let incompleteMidTerm = actionPlan.midTerm.filter { !$0.isCompleted }
+        for (index, task) in incompleteMidTerm.prefix(2).enumerated() {
             context += "\(index + 1). \(task.title): \(task.description)\n"
+        }
+        
+        // Add completed tasks context
+        if !completedTodayTaskTitles.isEmpty {
+            context += "\n已完成任務（不應重複生成）：\n"
+            for title in completedTodayTaskTitles {
+                context += "- \(title)\n"
+            }
         }
         
         let today = Date()
@@ -961,6 +1164,7 @@ class AIService {
         2. 任務應該與短期和中期目標相關，幫助推進這些目標
         3. 任務要具體、可執行，不要過於抽象
         4. 每個任務應該有明確的標題和簡短描述
+        5. **重要**：不要生成與已完成任務相同或類似的任務，應該推進到下一個階段
         
         請以JSON格式回應，格式如下：
         

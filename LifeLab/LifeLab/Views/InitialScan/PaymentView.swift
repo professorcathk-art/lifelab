@@ -3,18 +3,17 @@ import StoreKit
 
 struct PaymentView: View {
     @EnvironmentObject var viewModel: InitialScanViewModel
+    @EnvironmentObject var dataService: DataService
     @StateObject private var paymentService = PaymentService.shared
-    @State private var selectedPackage: SubscriptionPackage = .yearly
+    @StateObject private var themeManager = ThemeManager.shared
+    @State private var selectedPackage: SubscriptionPackage = .yearly // Always yearly in this stage
     @State private var isProcessing = false
     @State private var showError = false
     @State private var showSuccess = false
-    @State private var showPromoCodeSheet = false
-    @State private var promoCode = ""
-    @State private var promoCodeError = ""
-    @State private var promoCodeVerified = false
-    
-    // Secret promo code (change this to your desired code)
-    private let secretPromoCode = "LIFELAB2024"
+    @State private var showWaitingTime = false
+    @State private var hasCompletedPurchase = false // Track if purchase is completed
+    // Promo code functionality removed - not allowed by Apple
+    // Will be implemented after first version approval
     
     enum SubscriptionPackage: String, CaseIterable {
         case yearly = "yearly"
@@ -31,18 +30,19 @@ struct PaymentView: View {
         
         var productID: String {
             switch self {
-            case .yearly: return "com.resonance.lifelab.yearly"
+            case .yearly: return "com.resonance.lifelab.annually"
             case .quarterly: return "com.resonance.lifelab.quarterly"
             case .monthly: return "com.resonance.lifelab.monthly"
             }
         }
         
         var price: String {
-            // Will be updated from StoreKit products
+            // Fixed USD prices (monthly equivalent prices)
+            // These are the exact prices to display, regardless of StoreKit product prices
             switch self {
-            case .yearly: return "$7.9"
-            case .quarterly: return "$9.9"
-            case .monthly: return "$18.99"
+            case .yearly: return "US$ 7.59"      // USD 7.59/month (paid annually)
+            case .quarterly: return "US$ 9.99"   // USD 9.99/month (paid quarterly)
+            case .monthly: return "US$ 17.99"    // USD 17.99/month (paid monthly)
             }
         }
         
@@ -50,7 +50,7 @@ struct PaymentView: View {
             switch self {
             case .yearly: return "/月（年付）"
             case .quarterly: return "/月（季付，90天週期）"
-            case .monthly: return "/月（月付）"
+            case .monthly: return "/月"
             }
         }
         
@@ -64,56 +64,145 @@ struct PaymentView: View {
         
         func price(from products: [Product]) -> String {
             if let product = products.first(where: { $0.id == productID }) {
-                return product.displayPrice
+                // Convert product.price (Decimal) to USD format
+                // StoreKit will handle currency conversion at payment time
+                let priceDecimal = product.price
+                let priceDouble = NSDecimalNumber(decimal: priceDecimal).doubleValue
+                
+                // Format as USD
+                let formatter = NumberFormatter()
+                formatter.numberStyle = .currency
+                formatter.currencyCode = "USD"
+                formatter.maximumFractionDigits = 2
+                
+                if let formattedPrice = formatter.string(from: NSNumber(value: priceDouble)) {
+                    return formattedPrice
+                }
+                // Fallback: format manually with USD
+                return String(format: "$%.2f", priceDouble)
             }
             return price // Fallback
+        }
+        
+        // Return fixed USD monthly price
+        // IMPORTANT: Always use fixed prices, do NOT calculate from StoreKit product prices
+        // StoreKit will handle currency conversion at payment time, but we display fixed USD prices
+        func monthlyPrice(from products: [Product]) -> String {
+            // Always return fixed USD prices, regardless of StoreKit product prices
+            // This ensures consistent display across all regions
+            return price
         }
     }
     
     var body: some View {
         ScrollView {
-            VStack(spacing: 32) {
+            VStack(spacing: BrandSpacing.xxxl) {
+                // Hero Section - Vision Title Area
                 VStack(spacing: BrandSpacing.lg) {
-                    Image(systemName: "lock.shield.fill")
-                        .font(.system(size: 60))
-                        .foregroundStyle(BrandColors.primaryGradient)
+                    // Top Icon - Sparkles or Compass with soft gradient
+                    ZStack {
+                        if themeManager.isDarkMode {
+                            // Dark mode: Purple glow background
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [BrandColors.actionAccent.opacity(0.3), BrandColors.brandAccent.opacity(0.2)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 100, height: 100)
+                                .blur(radius: 20)
+                            
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 50))
+                                .foregroundColor(BrandColors.actionAccent)
+                        } else {
+                            // Day mode: Soft purple to gold gradient
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [Color(hex: "6B4EFF").opacity(0.2), Color(hex: "F5A623").opacity(0.15)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 100, height: 100)
+                                .blur(radius: 20)
+                            
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 50))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [Color(hex: "6B4EFF"), Color(hex: "F5A623")],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                        }
+                    }
                     
-                    Text("解鎖初版生命藍圖")
-                        .font(BrandTypography.largeTitle)
+                    // Main Title
+                    Text("預見你的理想人生")
+                        .font(Font.title.bold())
                         .foregroundColor(BrandColors.primaryText)
                     
-                    Text("選擇訂閱方案，即可查看AI為您生成的個人化生命藍圖")
+                    // Subtitle
+                    Text("解鎖專屬 AI 深度分析，從自我洞察到落地執行，一步步打造你真正渴望的生活。")
                         .font(BrandTypography.subheadline)
                         .foregroundColor(BrandColors.secondaryText)
                         .multilineTextAlignment(.center)
-                        .padding(.horizontal, BrandSpacing.xxxl)
+                        .lineSpacing(4)
+                        .padding(.horizontal, ResponsiveLayout.horizontalPadding())
                 }
                 .padding(.top, BrandSpacing.xxxl)
+                .frame(maxWidth: ResponsiveLayout.maxContentWidth())
+                .padding(.horizontal, ResponsiveLayout.horizontalPadding())
                 
-                // Subscription packages
-                VStack(spacing: 16) {
+                // Value Proposition List - Core Marketing Block
+                VStack(alignment: .leading, spacing: BrandSpacing.lg) {
+                    // Item 1: Target
+                    ValuePropositionItem(
+                        icon: "target",
+                        iconColor: themeManager.isDarkMode ? BrandColors.brandAccent : Color(hex: "F5A623"),
+                        title: "精準定位天賦與方向",
+                        description: "結合你熱愛、擅長與重視的事物，AI 將為你找出最佳的人生與職涯交集。"
+                    )
+                    
+                    // Item 2: Map
+                    ValuePropositionItem(
+                        icon: "map",
+                        iconColor: BrandColors.actionAccent,
+                        title: "專屬行動路徑與里程碑",
+                        description: "告別迷茫，獲得 AI 量身打造的具體行動計畫，讓夢想具備可執行性。"
+                    )
+                    
+                    // Item 3: Key
+                    ValuePropositionItem(
+                        icon: "key",
+                        iconColor: themeManager.isDarkMode ? BrandColors.brandAccent : Color(hex: "F5A623"),
+                        title: "解鎖進階深度探索",
+                        description: "開啟專屬自我洞察關卡，清理內在阻礙，全面釐清你的核心願景。"
+                    )
+                }
+                .padding(.horizontal, ResponsiveLayout.horizontalPadding())
+                .frame(maxWidth: ResponsiveLayout.maxContentWidth())
+                
+                // Pricing Cards - Show all subscription options
+                VStack(spacing: BrandSpacing.md) {
                     if paymentService.isLoading {
                         ProgressView("載入產品中...")
                             .padding()
-                    } else if paymentService.products.isEmpty {
-                        // Fallback: Show packages with default prices
-                        ForEach(SubscriptionPackage.allCases, id: \.self) { package in
-                            PackageCard(
-                                package: package,
-                                isSelected: selectedPackage == package,
-                                price: package.price(from: paymentService.products),
-                                onSelect: {
-                                    selectedPackage = package
-                                }
-                            )
-                        }
                     } else {
-                        // Show packages with real prices from StoreKit
+                        // Show all subscription packages: yearly, quarterly, monthly
+                        // All packages display monthly price
                         ForEach(SubscriptionPackage.allCases, id: \.self) { package in
                             PackageCard(
                                 package: package,
                                 isSelected: selectedPackage == package,
-                                price: package.price(from: paymentService.products),
+                                price: paymentService.products.isEmpty 
+                                    ? package.monthlyPrice(from: []) // Use monthlyPrice for all packages
+                                    : package.monthlyPrice(from: paymentService.products), // Use monthlyPrice for all packages
                                 onSelect: {
                                     selectedPackage = package
                                 }
@@ -121,84 +210,87 @@ struct PaymentView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, ResponsiveLayout.horizontalPadding())
+                .frame(maxWidth: ResponsiveLayout.maxContentWidth())
                 .onAppear {
                     // Load products when view appears
                     Task {
                         await paymentService.loadProducts()
                     }
                 }
-                
-                // Promo code button
-                Button(action: {
-                    showPromoCodeSheet = true
-                }) {
-                    HStack(spacing: BrandSpacing.sm) {
-                        Image(systemName: "ticket.fill")
-                        Text("使用優惠碼")
+                .onChange(of: paymentService.products) { products in
+                    // Refresh UI when products are loaded
+                    if !products.isEmpty {
+                        print("✅ Products loaded: \(products.map { "\($0.id): \($0.displayPrice)" })")
                     }
-                    .font(BrandTypography.subheadline)
-                    .foregroundColor(BrandColors.primaryBlue)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, BrandSpacing.md)
-                    .background(BrandColors.primaryBlue.opacity(0.1))
-                    .cornerRadius(BrandRadius.medium)
                 }
-                .buttonStyle(.plain)
-                .padding(.horizontal, BrandSpacing.xxxl)
                 
-                // Subscribe button with StoreKit integration
+                // CTA Button - "開啟我的理想人生"
                 Button(action: {
                     Task {
                         await handlePurchase()
                     }
                 }) {
                     HStack(spacing: BrandSpacing.sm) {
-                        if isProcessing {
+                        if isProcessing || viewModel.isLoadingBlueprint {
                             ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .progressViewStyle(CircularProgressViewStyle(
+                                    tint: BrandColors.invertedText
+                                ))
                                 .scaleEffect(0.8)
-                        } else {
-                            Image(systemName: "lock.open.fill")
                         }
-                        Text(isProcessing ? "處理中..." : "訂閱並解鎖")
+                        Text(getButtonText())
+                            .font(BrandTypography.headline)
+                            .fontWeight(.bold)
                     }
-                    .font(BrandTypography.subheadline)
-                    .foregroundColor(.white)
+                    .foregroundColor(BrandColors.invertedText)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, BrandSpacing.md)
-                    .background(BrandColors.primaryGradient)
-                    .cornerRadius(BrandRadius.medium)
-                    .shadow(color: BrandColors.primaryBlue.opacity(0.3), radius: 8, x: 0, y: 4)
+                    .frame(height: 50)
+                    .background(BrandColors.actionAccent) // Purple background
+                    .clipShape(Capsule())
+                    .shadow(
+                        color: BrandColors.buttonShadow.color,
+                        radius: BrandColors.buttonShadow.radius,
+                        x: BrandColors.buttonShadow.x,
+                        y: BrandColors.buttonShadow.y
+                    )
                 }
                 .buttonStyle(.plain)
-                .disabled(isProcessing || viewModel.isLoadingBlueprint || paymentService.isLoading)
-                .padding(.horizontal, BrandSpacing.xxxl)
+                .disabled(isProcessing || viewModel.isLoadingBlueprint || paymentService.isLoading || hasCompletedPurchase || dataService.userProfile?.lifeBlueprint != nil)
+                .padding(.horizontal, ResponsiveLayout.horizontalPadding())
+                .padding(.bottom, BrandSpacing.xxxl)
+                .frame(maxWidth: ResponsiveLayout.maxContentWidth())
                 
-                Text("註：可使用優惠碼功能")
-                    .font(BrandTypography.caption)
-                    .foregroundColor(BrandColors.secondaryText)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, BrandSpacing.xxxl)
-                    .padding(.bottom, BrandSpacing.xxxl)
-            }
-        }
-        .sheet(isPresented: $showPromoCodeSheet) {
-            PromoCodeSheet(
-                promoCode: $promoCode,
-                errorMessage: $promoCodeError,
-                onVerify: {
-                    verifyPromoCode()
-                },
-                onDismiss: {
-                    showPromoCodeSheet = false
-                    promoCode = ""
-                    promoCodeError = ""
+                // Waiting time message
+                if showWaitingTime || viewModel.isLoadingBlueprint {
+                    VStack(spacing: BrandSpacing.sm) {
+                        HStack(spacing: BrandSpacing.xs) {
+                            Image(systemName: "clock.fill")
+                                .foregroundColor(BrandColors.brandAccent)
+                                .font(.system(size: 16))
+                            Text("預計等待時間：2-3 分鐘")
+                                .font(BrandTypography.subheadline)
+                                .foregroundColor(BrandColors.secondaryText)
+                        }
+                        Text("AI 正在為您生成專屬生命藍圖，完成後將自動跳轉至首頁")
+                            .font(BrandTypography.caption)
+                            .foregroundColor(BrandColors.tertiaryText)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(BrandSpacing.md)
+                    .background(BrandColors.surface)
+                    .cornerRadius(BrandRadius.medium)
+                    .padding(.horizontal, ResponsiveLayout.horizontalPadding())
+                    .padding(.bottom, BrandSpacing.lg)
+                    .frame(maxWidth: ResponsiveLayout.maxContentWidth())
                 }
-            )
+            }
+            .frame(maxWidth: .infinity)
         }
+        .background(BrandColors.background)
         .alert("購買成功", isPresented: $showSuccess) {
             Button("確定") {
+                hasCompletedPurchase = true // Mark purchase as completed
                 viewModel.completePayment()
             }
         } message: {
@@ -209,74 +301,171 @@ struct PaymentView: View {
         } message: {
             Text(paymentService.errorMessage ?? "未知錯誤")
         }
-        .alert("優惠碼驗證成功", isPresented: $promoCodeVerified) {
-            Button("確定") {
-                isProcessing = true
-                viewModel.completePayment()
-                showPromoCodeSheet = false
-                promoCode = ""
-                promoCodeError = ""
-                promoCodeVerified = false
+        .onChange(of: viewModel.isLoadingBlueprint) { isLoading in
+            if isLoading {
+                showWaitingTime = true
+                hasCompletedPurchase = true // Keep button disabled during loading
+            } else {
+                // Loading completed - ContentView will automatically switch to MainTabView
+                // when blueprint is detected in dataService.userProfile
+                print("✅ PaymentView: Loading completed, waiting for ContentView to detect blueprint")
             }
-        } message: {
-            Text("優惠碼驗證成功！正在為您生成生命藍圖...")
+        }
+        .onChange(of: dataService.userProfile?.lifeBlueprint) { blueprint in
+            // When blueprint is generated and saved to DataService,
+            // ContentView will immediately detect it and switch to MainTabView
+            if blueprint != nil {
+                hasCompletedPurchase = true // Ensure button stays disabled
+                print("✅ PaymentView: Blueprint detected in DataService, ContentView will navigate")
+                // ContentView's hasCompletedInitialScan will become true immediately
+                // and switch to MainTabView without delay
+            }
+        }
+        .onAppear {
+            // Check if user already has a blueprint (already purchased)
+            if dataService.userProfile?.lifeBlueprint != nil {
+                hasCompletedPurchase = true
+                print("✅ PaymentView: User already has blueprint, marking as purchased")
+                return
+            }
+            
+            // CRITICAL: Check subscription status - must have BOTH StoreKit AND Supabase
+            // Only use SubscriptionManager's hasActiveSubscription (checks both)
+            Task {
+                // Wait for subscription check to complete
+                await SubscriptionManager.shared.checkSubscriptionStatus()
+                await paymentService.refreshPurchasedProducts()
+                
+                let subscriptionManager = SubscriptionManager.shared
+                let hasActiveSubscription = subscriptionManager.hasActiveSubscription
+                
+                await MainActor.run {
+                    if hasActiveSubscription {
+                        // User has valid subscription in BOTH StoreKit AND Supabase
+                        hasCompletedPurchase = true
+                        
+                        // If user has active subscription but no blueprint, auto-generate
+                        if dataService.userProfile?.lifeBlueprint == nil {
+                            print("✅✅✅ PaymentView: User has VALID subscription (StoreKit + Supabase), auto-generating blueprint")
+                            viewModel.hasPaid = true // Mark as paid to allow blueprint generation
+                            viewModel.generateLifeBlueprint()
+                        }
+                    } else {
+                        // User has NO valid subscription - show payment page
+                        print("❌❌❌ PaymentView: User has NO valid subscription")
+                        print("   SubscriptionManager.hasActiveSubscription: \(subscriptionManager.hasActiveSubscription)")
+                        print("   PaymentService.hasActiveSubscription: \(paymentService.hasActiveSubscription)")
+                        print("   User MUST pay before generating blueprint")
+                        hasCompletedPurchase = false
+                    }
+                }
+            }
         }
     }
     
-    private func verifyPromoCode() {
-        let enteredCode = promoCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-        
-        if enteredCode.isEmpty {
-            promoCodeError = "請輸入優惠碼"
-            return
-        }
-        
-        if enteredCode == secretPromoCode {
-            promoCodeError = ""
-            promoCodeVerified = true
+    private func getButtonText() -> String {
+        if isProcessing {
+            return "處理中..."
+        } else if viewModel.isLoadingBlueprint {
+            return "正在生成生命藍圖..."
         } else {
-            promoCodeError = "優惠碼無效，請重新輸入"
+            return "開啟我的理想人生"
         }
     }
     
     private func handlePurchase() async {
         isProcessing = true
+        showWaitingTime = true
         
-        // Find the selected product
-        let productID = selectedPackage.productID
+        // Get the product for yearly subscription
+        let productID = selectedPackage.productID // "com.resonance.lifelab.yearly"
+        
+        // Ensure products are loaded
+        if paymentService.products.isEmpty {
+            print("📦 Products not loaded yet, loading now...")
+            await paymentService.loadProducts()
+        }
+        
+        // Find the product
         guard let product = paymentService.products.first(where: { $0.id == productID }) else {
-            // If product not loaded, use skip payment for testing
-            print("⚠️ Product not loaded, using skip payment")
+            print("❌ Product not found: \(productID)")
+            print("📦 Available products: \(paymentService.products.map { $0.id })")
             await MainActor.run {
                 isProcessing = false
-                viewModel.completePayment()
+                showWaitingTime = false
+                paymentService.errorMessage = "無法載入產品，請稍後再試"
+                showError = true
             }
             return
         }
         
+        print("✅ Found product: \(product.id) - \(product.displayPrice)")
+        
+        // Attempt purchase
         do {
             let success = try await paymentService.purchase(product)
+            
             await MainActor.run {
                 isProcessing = false
+                
                 if success {
+                    print("✅ Purchase successful!")
+                    // Show success alert, which will trigger completePayment()
                     showSuccess = true
-                    // Payment successful, complete payment will be called from alert
                 } else {
-                    // User cancelled or pending
-                    if paymentService.errorMessage != nil {
+                    // User cancelled or purchase pending
+                    showWaitingTime = false
+                    if let errorMsg = paymentService.errorMessage, !errorMsg.isEmpty {
                         showError = true
                     }
                 }
             }
         } catch {
+            print("❌ Purchase error: \(error.localizedDescription)")
             await MainActor.run {
                 isProcessing = false
+                showWaitingTime = false
+                paymentService.errorMessage = "購買失敗：\(error.localizedDescription)"
                 showError = true
             }
         }
     }
 }
 
+// MARK: - Value Proposition Item Component
+struct ValuePropositionItem: View {
+    let icon: String
+    let iconColor: Color
+    let title: String
+    let description: String
+    
+    var body: some View {
+        HStack(alignment: .top, spacing: BrandSpacing.md) {
+            // Left Icon
+            Image(systemName: icon)
+                .font(.system(size: 24))
+                .foregroundColor(iconColor)
+                .frame(width: 32, height: 32)
+            
+            // Right Content
+            VStack(alignment: .leading, spacing: BrandSpacing.xs) {
+                Text(title)
+                    .font(BrandTypography.headline)
+                    .fontWeight(.bold)
+                    .foregroundColor(BrandColors.primaryText)
+                
+                Text(description)
+                    .font(BrandTypography.body)
+                    .foregroundColor(BrandColors.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            
+            Spacer()
+        }
+    }
+}
+
+// MARK: - Package Card Component (Theme-Aware)
 struct PackageCard: View {
     let package: PaymentView.SubscriptionPackage
     let isSelected: Bool
@@ -290,173 +479,113 @@ struct PackageCard: View {
         self.onSelect = onSelect
     }
     
+    var isYearly: Bool {
+        package == .yearly
+    }
+    
     var body: some View {
         Button(action: onSelect) {
-            HStack {
-                VStack(alignment: .leading, spacing: BrandSpacing.sm) {
-                    HStack {
-                        Text(package.title)
-                            .font(BrandTypography.headline)
-                            .foregroundColor(BrandColors.primaryText)
+            ZStack(alignment: .topTrailing) {
+                HStack {
+                    VStack(alignment: .leading, spacing: BrandSpacing.sm) {
+                        HStack {
+                            Text(package.title)
+                                .font(BrandTypography.headline)
+                                .fontWeight(.bold)
+                                .foregroundColor(BrandColors.primaryText)
+                            
+                            if let savings = package.savings {
+                                Text(savings)
+                                    .font(BrandTypography.caption)
+                                    .foregroundColor(
+                                        ThemeManager.shared.isDarkMode 
+                                            ? BrandColors.brandAccent 
+                                            : Color(hex: "F5A623")
+                                    )
+                                    .fontWeight(.semibold)
+                                    .padding(.horizontal, BrandSpacing.sm)
+                                    .padding(.vertical, BrandSpacing.xs)
+                                    .background(
+                                        ThemeManager.shared.isDarkMode 
+                                            ? BrandColors.brandAccent.opacity(0.15)
+                                            : Color(hex: "F5A623").opacity(0.15)
+                                    )
+                                    .cornerRadius(BrandRadius.small)
+                            }
+                        }
                         
-                        if let savings = package.savings {
-                            Text(savings)
-                                .font(BrandTypography.caption)
-                                .foregroundColor(BrandColors.primaryBlue)
-                                .fontWeight(.semibold)
-                                .padding(.horizontal, BrandSpacing.sm)
-                                .padding(.vertical, BrandSpacing.xs)
-                                .background(BrandColors.primaryBlue.opacity(0.15))
-                                .cornerRadius(BrandRadius.small)
+                        HStack(alignment: .firstTextBaseline, spacing: BrandSpacing.xs) {
+                            Text(price)
+                                .font(BrandTypography.title2)
+                                .fontWeight(.bold)
+                                .foregroundColor(BrandColors.primaryText)
+                            Text(package.period)
+                                .font(BrandTypography.subheadline)
+                                .foregroundColor(BrandColors.secondaryText)
                         }
                     }
                     
-                    HStack(alignment: .firstTextBaseline, spacing: BrandSpacing.xs) {
-                        Text(price)
-                            .font(BrandTypography.title2)
-                            .foregroundColor(BrandColors.primaryText)
-                        Text(package.period)
-                            .font(BrandTypography.subheadline)
-                            .foregroundColor(BrandColors.secondaryText)
-                    }
+                    Spacer()
+                    
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.title2)
+                        .foregroundColor(
+                            isSelected 
+                                ? BrandColors.actionAccent 
+                                : BrandColors.secondaryText
+                        )
                 }
+                .padding(BrandSpacing.lg)
+                .background(
+                    isYearly && isSelected
+                        ? (ThemeManager.shared.isDarkMode 
+                            ? BrandColors.actionAccent.opacity(0.15)
+                            : Color(hex: "F8F6FF")) // Very light purple background
+                        : BrandColors.surface
+                )
+                .cornerRadius(BrandRadius.large)
+                .overlay(
+                    RoundedRectangle(cornerRadius: BrandRadius.large)
+                        .stroke(
+                            isYearly && isSelected
+                                ? BrandColors.actionAccent // Purple border for yearly
+                                : (isSelected 
+                                    ? BrandColors.borderColor 
+                                    : BrandColors.borderColor),
+                            lineWidth: isYearly && isSelected ? 2 : 1
+                        )
+                )
+                .shadow(
+                    color: BrandColors.cardShadow.color,
+                    radius: BrandColors.cardShadow.radius,
+                    x: BrandColors.cardShadow.x,
+                    y: BrandColors.cardShadow.y
+                )
                 
-                Spacer()
-                
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.title2)
-                    .foregroundColor(isSelected ? BrandColors.primaryBlue : BrandColors.tertiaryText)
+                // Best Value Badge (only for yearly when selected)
+                if isYearly && isSelected {
+                    HStack(spacing: BrandSpacing.xs) {
+                        Text("🔥")
+                            .font(.system(size: 12))
+                        Text("最佳價值")
+                            .font(BrandTypography.caption)
+                            .fontWeight(.bold)
+                    }
+                    .foregroundColor(BrandColors.invertedText) // White text
+                    .padding(.horizontal, BrandSpacing.sm)
+                    .padding(.vertical, BrandSpacing.xs)
+                    .background(BrandColors.actionAccent) // Purple background
+                    .cornerRadius(BrandRadius.small)
+                    .padding(BrandSpacing.sm)
+                }
             }
-            .padding()
-            .background(isSelected ? BrandColors.primaryBlue.opacity(0.15) : BrandColors.secondaryBackground)
-            .cornerRadius(BrandRadius.medium)
-            .overlay(
-                RoundedRectangle(cornerRadius: BrandRadius.medium)
-                    .stroke(isSelected ? BrandColors.primaryBlue : Color.clear, lineWidth: 2)
-            )
-            .shadow(color: isSelected ? BrandColors.primaryBlue.opacity(0.2) : BrandShadow.small.color, 
-                   radius: isSelected ? 8 : BrandShadow.small.radius, 
-                   x: 0, 
-                   y: isSelected ? 4 : BrandShadow.small.y)
         }
         .buttonStyle(.plain)
     }
 }
 
-// MARK: - Promo Code Sheet
-
-struct PromoCodeSheet: View {
-    @Binding var promoCode: String
-    @Binding var errorMessage: String
-    let onVerify: () -> Void
-    let onDismiss: () -> Void
-    @FocusState private var isTextFieldFocused: Bool
-    
-    var body: some View {
-        NavigationView {
-            VStack(spacing: BrandSpacing.xl) {
-                VStack(spacing: BrandSpacing.md) {
-                    Image(systemName: "ticket.fill")
-                        .font(.system(size: 60))
-                        .foregroundStyle(BrandColors.primaryGradient)
-                    
-                    Text("輸入優惠碼")
-                        .font(BrandTypography.largeTitle)
-                        .foregroundColor(BrandColors.primaryText)
-                    
-                    Text("輸入優惠碼即可跳過付款，直接生成生命藍圖")
-                        .font(BrandTypography.subheadline)
-                        .foregroundColor(BrandColors.secondaryText)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, BrandSpacing.lg)
-                }
-                .padding(.top, BrandSpacing.xxxl)
-                
-                VStack(alignment: .leading, spacing: BrandSpacing.sm) {
-                    Text("優惠碼")
-                        .font(BrandTypography.headline)
-                        .foregroundColor(BrandColors.primaryText)
-                    
-                    TextField("請輸入優惠碼", text: $promoCode)
-                        .textFieldStyle(.plain)
-                        .font(BrandTypography.body)
-                        .padding(BrandSpacing.md)
-                        .background(
-                            RoundedRectangle(cornerRadius: BrandRadius.medium)
-                                .fill(BrandColors.secondaryBackground)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: BrandRadius.medium)
-                                        .stroke(errorMessage.isEmpty ? BrandColors.primaryBlue.opacity(0.2) : Color.red.opacity(0.5), lineWidth: 1)
-                                )
-                        )
-                        .autocapitalization(.allCharacters)
-                        .autocorrectionDisabled()
-                        .focused($isTextFieldFocused)
-                        .onSubmit {
-                            onVerify()
-                        }
-                    
-                    if !errorMessage.isEmpty {
-                        HStack(spacing: BrandSpacing.xs) {
-                            Image(systemName: "exclamationmark.circle.fill")
-                                .foregroundColor(.red)
-                                .font(.system(size: 14))
-                            Text(errorMessage)
-                                .font(BrandTypography.caption)
-                                .foregroundColor(.red)
-                        }
-                        .padding(.leading, BrandSpacing.sm)
-                    }
-                }
-                .padding(.horizontal, BrandSpacing.xxxl)
-                
-                Spacer()
-                
-                Button(action: {
-                    onVerify()
-                }) {
-                    HStack(spacing: BrandSpacing.sm) {
-                        Image(systemName: "checkmark.circle.fill")
-                        Text("驗證優惠碼")
-                    }
-                    .font(BrandTypography.headline)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, BrandSpacing.lg)
-                    .background(BrandColors.primaryGradient)
-                    .cornerRadius(BrandRadius.medium)
-                    .shadow(color: BrandColors.primaryBlue.opacity(0.3), radius: 8, x: 0, y: 4)
-                }
-                .buttonStyle(.plain)
-                .disabled(promoCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                .opacity(promoCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.6 : 1.0)
-                .padding(.horizontal, BrandSpacing.xxxl)
-                .padding(.bottom, BrandSpacing.xxxl)
-            }
-            .navigationTitle("優惠碼")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("取消") {
-                        onDismiss()
-                    }
-                    .foregroundColor(BrandColors.primaryBlue)
-                }
-            }
-            .onAppear {
-                // Auto-focus text field when sheet appears
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    isTextFieldFocused = true
-                }
-            }
-        }
-    }
-}
-
-#Preview {
-    PaymentView()
-        .environmentObject(InitialScanViewModel())
-}
+// MARK: - Promo Code Sheet (Removed - not allowed by Apple)
+// Will be implemented after first version approval if needed
 
 #Preview {
     PaymentView()

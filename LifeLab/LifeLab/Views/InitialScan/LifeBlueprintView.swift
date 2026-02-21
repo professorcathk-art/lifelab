@@ -16,14 +16,17 @@ struct LifeBlueprintView: View {
                         .font(BrandTypography.subheadline)
                         .foregroundColor(BrandColors.secondaryText)
                         .multilineTextAlignment(.center)
+                        .padding(.horizontal, ResponsiveLayout.horizontalPadding())
                 }
                 .padding(.top, BrandSpacing.xxxl)
+                .frame(maxWidth: ResponsiveLayout.maxContentWidth())
+                .padding(.horizontal, ResponsiveLayout.horizontalPadding())
                 
                 if viewModel.isLoadingBlueprint {
                     VStack(spacing: BrandSpacing.lg) {
                         ProgressView()
                             .scaleEffect(1.5)
-                            .tint(BrandColors.primaryBlue)
+                            .tint(BrandColors.actionAccent)
                         Text("正在生成生命藍圖...")
                             .font(BrandTypography.subheadline)
                             .foregroundColor(BrandColors.secondaryText)
@@ -39,7 +42,7 @@ struct LifeBlueprintView: View {
                         }) {
                             Text("如果等待時間過長，點擊重試")
                                 .font(BrandTypography.caption)
-                                .foregroundColor(BrandColors.primaryBlue)
+                                .foregroundColor(BrandColors.actionAccent)
                                 .padding(.top, BrandSpacing.md)
                         }
                         .buttonStyle(.plain)
@@ -57,13 +60,13 @@ struct LifeBlueprintView: View {
                                 .font(BrandTypography.caption)
                                 .foregroundColor(BrandColors.secondaryText)
                         }
-                        .padding(.horizontal, BrandSpacing.xl)
+                        .padding(.horizontal, ResponsiveLayout.horizontalPadding())
                         
                         if !blueprint.vocationDirections.isEmpty {
                             VStack(alignment: .leading, spacing: BrandSpacing.lg) {
                                 HStack {
                                     Image(systemName: "sparkles")
-                                        .foregroundColor(BrandColors.primaryBlue)
+                                        .foregroundColor(BrandColors.actionAccent)
                                     Text("基礎天職猜測")
                                         .font(BrandTypography.title2)
                                         .foregroundColor(BrandColors.primaryText)
@@ -88,9 +91,8 @@ struct LifeBlueprintView: View {
                             }
                             .padding(BrandSpacing.lg)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(BrandColors.secondaryBackground)
+                            .background(BrandColors.surface)
                             .cornerRadius(BrandRadius.medium)
-                            .shadow(color: BrandShadow.medium.color, radius: BrandShadow.medium.radius, x: BrandShadow.medium.x, y: BrandShadow.medium.y)
                         }
                         
                         if !blueprint.feasibilityAssessment.isEmpty {
@@ -106,22 +108,22 @@ struct LifeBlueprintView: View {
                             }
                             .padding(BrandSpacing.lg)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(BrandColors.secondaryBackground)
+                            .background(BrandColors.surface)
                             .cornerRadius(BrandRadius.medium)
-                            .shadow(color: BrandShadow.medium.color, radius: BrandShadow.medium.radius, x: BrandShadow.medium.x, y: BrandShadow.medium.y)
                         }
                     }
-                    .padding(.horizontal, BrandSpacing.xl)
+                    .padding(.horizontal, ResponsiveLayout.horizontalPadding())
+                    .frame(maxWidth: ResponsiveLayout.maxContentWidth())
                     
                     // Share/Export buttons
                     HStack(spacing: BrandSpacing.md) {
                         ShareLink(item: generateBlueprintText(blueprint: blueprint)) {
                             Label("分享", systemImage: "square.and.arrow.up")
                                 .font(BrandTypography.headline)
-                                .foregroundColor(BrandColors.primaryBlue)
+                                .foregroundColor(BrandColors.actionAccent)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, BrandSpacing.lg)
-                                .background(BrandColors.primaryBlue.opacity(0.1))
+                                .background(BrandColors.actionAccent.opacity(0.1))
                                 .cornerRadius(BrandRadius.medium)
                         }
                         
@@ -130,17 +132,19 @@ struct LifeBlueprintView: View {
                         }) {
                             Label("導出", systemImage: "doc.badge.plus")
                                 .font(BrandTypography.headline)
-                                .foregroundColor(Color(hex: "10b6cc"))
+                                .foregroundColor(BrandColors.brandAccent)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, BrandSpacing.lg)
-                                .background(Color(hex: "10b6cc").opacity(0.1))
+                                .background(BrandColors.brandAccent.opacity(0.1))
                                 .cornerRadius(BrandRadius.medium)
                         }
                     }
-                    .padding(.horizontal, BrandSpacing.xl)
+                    .padding(.horizontal, ResponsiveLayout.horizontalPadding())
                     .padding(.bottom, BrandSpacing.xxxl)
+                    .frame(maxWidth: ResponsiveLayout.maxContentWidth())
                 }
             }
+            .frame(maxWidth: .infinity)
         }
     }
     
@@ -149,12 +153,10 @@ struct LifeBlueprintView: View {
         
         if !blueprint.vocationDirections.isEmpty {
             text += "基礎天職猜測：\n"
-            for (index, direction) in blueprint.vocationDirections.enumerated() {
-                text += "\n\(index + 1). \(direction.title)\n"
-                text += "   \(direction.description)\n"
-                text += "   市場可行性：\(direction.marketFeasibility)\n"
+            for direction in blueprint.vocationDirections {
+                text += "• \(direction.title)\n"
+                text += "  \(direction.description)\n\n"
             }
-            text += "\n"
         }
         
         if !blueprint.strengthsSummary.isEmpty {
@@ -165,38 +167,21 @@ struct LifeBlueprintView: View {
             text += "可行性初評：\n\(blueprint.feasibilityAssessment)\n"
         }
         
-        text += "\n---\n由 LifeLab 生成"
         return text
     }
     
     private func exportBlueprintToFile(blueprint: LifeBlueprint) {
         let text = generateBlueprintText(blueprint: blueprint)
-        let formatter = DateFormatter()
-        formatter.dateStyle = .short
-        let dateString = formatter.string(from: Date())
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("生命藍圖_\(dateString).txt")
+        let activityVC = UIActivityViewController(activityItems: [text], applicationActivities: nil)
         
-        do {
-            try text.write(to: url, atomically: true, encoding: .utf8)
-            let activityVC = UIActivityViewController(activityItems: [url], applicationActivities: nil)
-            
-            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-               let window = windowScene.windows.first,
-               let rootViewController = window.rootViewController {
-                // For iPad
-                if let popover = activityVC.popoverPresentationController {
-                    popover.sourceView = window
-                    popover.sourceRect = CGRect(x: window.bounds.midX, y: window.bounds.midY, width: 0, height: 0)
-                    popover.permittedArrowDirections = []
-                }
-                rootViewController.present(activityVC, animated: true)
-            }
-        } catch {
-            print("Export failed: \(error)")
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let rootViewController = windowScene.windows.first?.rootViewController {
+            rootViewController.present(activityVC, animated: true)
         }
     }
 }
 
+// MARK: - Vocation Direction Card with Data Chips
 struct VocationDirectionCard: View {
     let direction: VocationDirection
     
@@ -208,26 +193,74 @@ struct VocationDirectionCard: View {
             
             Text(direction.description)
                 .font(BrandTypography.subheadline)
-                .foregroundColor(BrandColors.secondaryText)
+                .foregroundColor(BrandColors.primaryText)
                 .lineSpacing(6)
             
-            HStack(spacing: BrandSpacing.xs) {
-                Image(systemName: "chart.line.uptrend.xyaxis")
-                    .font(BrandTypography.caption)
-                Text(direction.marketFeasibility)
-                    .font(BrandTypography.caption)
+            // Data Chips - Small data labels with icons
+            VStack(alignment: .leading, spacing: BrandSpacing.sm) {
+                // Market Feasibility
+                if !direction.marketFeasibility.isEmpty {
+                    DataChip(
+                        icon: "chart.line.uptrend.xyaxis",
+                        title: "市場需求",
+                        value: direction.marketFeasibility
+                    )
+                }
+                
+                // Salary (if available in description or separate field)
+                // You can add more data chips here based on your data model
             }
-            .foregroundColor(BrandColors.primaryBlue)
         }
         .padding(BrandSpacing.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(BrandColors.secondaryBackground)
-        .cornerRadius(BrandRadius.medium)
+        .background(BrandColors.surface)
+        .cornerRadius(16)
         .overlay(
-            RoundedRectangle(cornerRadius: BrandRadius.medium)
-                .stroke(Color(hex: "E5E7EB"), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(BrandColors.borderColor, lineWidth: 1)
         )
-        .shadow(color: BrandShadow.small.color, radius: BrandShadow.small.radius, x: BrandShadow.small.x, y: BrandShadow.small.y)
+        .shadow(
+            color: BrandColors.cardShadow.color,
+            radius: BrandColors.cardShadow.radius,
+            x: BrandColors.cardShadow.x,
+            y: BrandColors.cardShadow.y
+        )
+    }
+}
+
+// MARK: - Data Chip Component (Theme-Aware)
+struct DataChip: View {
+    let icon: String
+    let title: String
+    let value: String
+    
+    var body: some View {
+        HStack(spacing: BrandSpacing.xs) {
+            Image(systemName: icon)
+                .font(.system(size: 12))
+                .foregroundColor(BrandColors.actionAccent)
+            
+            Text(title)
+                .font(BrandTypography.caption)
+                .foregroundColor(
+                    ThemeManager.shared.isDarkMode 
+                        ? BrandColors.secondaryText
+                        : BrandColors.dayModeDataChipText
+                )
+            
+            Text(value)
+                .font(BrandTypography.caption)
+                .fontWeight(.semibold)
+                .foregroundColor(BrandColors.actionAccent)
+        }
+        .padding(.horizontal, BrandSpacing.sm)
+        .padding(.vertical, BrandSpacing.xs)
+        .background(
+            ThemeManager.shared.isDarkMode 
+                ? BrandColors.surface.opacity(0.5) // Dark mode background
+                : BrandColors.dayModeDataChipBackground // Very light purple in day mode
+        )
+        .cornerRadius(8)
     }
 }
 

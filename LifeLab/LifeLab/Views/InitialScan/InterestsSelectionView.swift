@@ -5,155 +5,214 @@ struct InterestsSelectionView: View {
     @State private var hasStarted = false
     
     var body: some View {
-        if !hasStarted {
-            // Welcome/Introduction Screen
-            welcomeScreen
-        } else {
-            // Keywords Selection Screen
-            keywordsSelectionScreen
+        ZStack {
+            // Pure black background - NO gradients, NO white/gray at bottom
+            BrandColors.background
+                .ignoresSafeArea()
+            
+            if !hasStarted {
+                welcomeScreen
+            } else {
+                keywordsSelectionScreen
+            }
         }
+        .preferredColorScheme(ThemeManager.shared.isDarkMode ? .dark : .light)
     }
     
+    // MARK: - Welcome Screen
     private var welcomeScreen: some View {
-        VStack(spacing: 32) {
-            Spacer()
-            
-            VStack(spacing: BrandSpacing.xxl) {
-                Image(systemName: "heart.fill")
-                    .font(.system(size: 60))
-                    .foregroundColor(BrandColors.primaryBlue)
-                
-                VStack(spacing: BrandSpacing.lg) {
-                    Text("我喜歡的事")
-                        .font(BrandTypography.largeTitle)
-                        .foregroundColor(BrandColors.primaryText)
-                    
-                    Text("接下來，我們會請您選擇感興趣的關鍵詞")
-                        .font(BrandTypography.title3)
-                        .foregroundColor(BrandColors.primaryText)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, BrandSpacing.xxxl)
-                    
-                    VStack(alignment: .leading, spacing: BrandSpacing.md) {
-                        HStack(spacing: BrandSpacing.md) {
-                            Image(systemName: "1.circle.fill")
-                                .foregroundColor(BrandColors.primaryBlue)
-                            Text("點擊您感興趣的關鍵詞")
-                                .font(BrandTypography.body)
-                                .foregroundColor(BrandColors.primaryText)
-                        }
-                        
-                        HStack(spacing: BrandSpacing.md) {
-                            Image(systemName: "2.circle.fill")
-                                .foregroundColor(BrandColors.primaryBlue)
-                            Text("我們會根據您的選擇顯示相關詞語")
-                                .font(BrandTypography.body)
-                                .foregroundColor(BrandColors.primaryText)
-                        }
-                        
-                        HStack(spacing: BrandSpacing.md) {
-                            Image(systemName: "3.circle.fill")
-                                .foregroundColor(BrandColors.primaryBlue)
-                            Text("選擇越多，分析越準確")
-                                .font(BrandTypography.body)
-                                .foregroundColor(BrandColors.primaryText)
-                        }
-                    }
-                    .padding(.horizontal, BrandSpacing.xxxl)
-                    .padding(.top, BrandSpacing.sm)
-                }
-                
-                    VStack(spacing: BrandSpacing.md) {
-                        HStack(spacing: BrandSpacing.sm) {
-                            Image(systemName: "timer")
-                                .foregroundColor(BrandColors.warning)
-                            Text("點擊「開始」後，計時器將開始倒數")
-                                .font(BrandTypography.subheadline)
-                                .foregroundColor(BrandColors.warning)
-                                .fontWeight(.semibold)
-                        }
-                        .padding(BrandSpacing.lg)
-                        .background(BrandColors.warning.opacity(0.1))
-                        .cornerRadius(BrandRadius.medium)
-                        
-                        Text("剩餘時間：\(viewModel.timeRemaining)秒")
-                            .font(BrandTypography.title2)
-                            .foregroundColor(BrandColors.secondaryText)
-                    }
-                    .padding(.horizontal, BrandSpacing.xxxl)
-            }
-            
-            Spacer()
-            
-            Button(action: {
-                hasStarted = true
-                viewModel.startInterestTimer()
-            }) {
-                HStack(spacing: BrandSpacing.sm) {
-                    Text("開始")
-                    Image(systemName: "play.fill")
-                }
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, BrandSpacing.lg)
-                .background(BrandColors.primaryGradient)
-                .cornerRadius(BrandRadius.medium)
-                .shadow(color: BrandColors.primaryBlue.opacity(0.3), radius: 8, x: 0, y: 4)
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal, BrandSpacing.xxxl)
-            .padding(.bottom, 60)
-        }
-    }
-    
-    private var keywordsSelectionScreen: some View {
-        VStack(spacing: BrandSpacing.xxl) {
-            VStack(spacing: BrandSpacing.md) {
-                Text("我喜歡的事")
-                    .font(BrandTypography.largeTitle)
-                    .foregroundColor(BrandColors.primaryText)
-                
-                if viewModel.isTimerActive {
-                    HStack(spacing: BrandSpacing.sm) {
-                        Image(systemName: "timer")
-                            .foregroundColor(BrandColors.warning)
-                        Text("剩餘時間：\(viewModel.timeRemaining)秒")
-                            .font(BrandTypography.title2)
-                            .fontWeight(.semibold)
-                            .foregroundColor(BrandColors.warning)
-                    }
-                    .padding(BrandSpacing.lg)
-                    .background(BrandColors.warning.opacity(0.1))
-                    .cornerRadius(BrandRadius.medium)
-                } else if viewModel.showConfirmButton {
-                    Text("時間到！請點擊「確認」進入下一步")
-                        .font(BrandTypography.subheadline)
-                        .foregroundColor(BrandColors.warning)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, BrandSpacing.xxxl)
-                }
-            }
-            .padding(.top, BrandSpacing.xxxl)
-            
+        VStack(spacing: 0) {
             ScrollView {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 100))], spacing: BrandSpacing.md) {
-                    ForEach(viewModel.availableKeywords, id: \.self) { keyword in
-                        KeywordButton(
-                            keyword: keyword,
-                            isSelected: false,
-                            action: {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                    viewModel.selectInterest(keyword)
+                VStack(spacing: BrandSpacing.xxl) {
+                    Spacer()
+                        .frame(height: BrandSpacing.xxxl)
+                    
+                    VStack(spacing: BrandSpacing.xxl) {
+                        // Hero Icon - Clean circle with purple heart, NO glow/shadow
+                        ZStack {
+                            Circle()
+                                .fill(BrandColors.surface) // #1C1C1E - Dark charcoal
+                                .frame(width: 120, height: 120)
+                            
+                            Image(systemName: "heart.fill")
+                                .font(.system(size: 60))
+                                .foregroundColor(BrandColors.actionAccent) // Purple #8B5CF6
+                        }
+                        // NO shadow, NO glow - clean and flat
+                        
+                        VStack(spacing: BrandSpacing.lg) {
+                            Text("我喜歡的事")
+                                .font(BrandTypography.largeTitle)
+                                .foregroundColor(BrandColors.primaryText) // Pure white
+                            
+                            Text("接下來，我們會請您選擇感興趣的關鍵詞")
+                                .font(BrandTypography.title3)
+                                .foregroundColor(BrandColors.primaryText) // Pure white
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, ResponsiveLayout.horizontalPadding())
+                            
+                            // Instruction List - Purple circles, white text, increased spacing
+                            VStack(alignment: .leading, spacing: BrandSpacing.lg) {
+                                HStack(spacing: BrandSpacing.md) {
+                                    Image(systemName: "1.circle.fill")
+                                        .foregroundColor(BrandColors.actionAccent) // Purple
+                                        .font(.system(size: 20))
+                                    Text("點擊您感興趣的關鍵詞")
+                                        .font(BrandTypography.body)
+                                        .foregroundColor(BrandColors.primaryText) // Pure white
+                                }
+                                
+                                HStack(spacing: BrandSpacing.md) {
+                                    Image(systemName: "2.circle.fill")
+                                        .foregroundColor(BrandColors.actionAccent) // Purple
+                                        .font(.system(size: 20))
+                                    Text("我們會根據您的選擇顯示相關詞語")
+                                        .font(BrandTypography.body)
+                                        .foregroundColor(BrandColors.primaryText) // Pure white
+                                }
+                                
+                                HStack(spacing: BrandSpacing.md) {
+                                    Image(systemName: "3.circle.fill")
+                                        .foregroundColor(BrandColors.actionAccent) // Purple
+                                        .font(.system(size: 20))
+                                    Text("選擇越多，分析越準確")
+                                        .font(BrandTypography.body)
+                                        .foregroundColor(BrandColors.primaryText) // Pure white
                                 }
                             }
-                        )
+                            .padding(.horizontal, ResponsiveLayout.horizontalPadding())
+                            .padding(.top, BrandSpacing.sm)
+                        }
+                        
+                        // Warning/Info Box - Dark charcoal background, yellow timer icon, white text
+                        VStack(spacing: BrandSpacing.md) {
+                            HStack(spacing: BrandSpacing.sm) {
+                                Image(systemName: "timer")
+                                    .foregroundColor(BrandColors.brandAccent) // Golden yellow #FFC107
+                                    .font(.system(size: 18))
+                                Text("點擊「開始」後，計時器將開始倒數")
+                                    .font(BrandTypography.subheadline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(BrandColors.primaryText) // Pure white
+                            }
+                            .padding(BrandSpacing.lg)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(BrandColors.surface) // #1C1C1E
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(BrandColors.actionAccent.opacity(0.3), lineWidth: 1) // Thin purple border
+                                    )
+                            )
+                            
+                            // Timer Text - Large, heavy/monospaced, pure white
+                            Text("剩餘時間：\(viewModel.timeRemaining)秒")
+                                .font(.system(size: 28, weight: .heavy, design: .monospaced))
+                                .foregroundColor(BrandColors.primaryText) // Pure white
+                        }
+                        .padding(.horizontal, ResponsiveLayout.horizontalPadding())
+                        .frame(maxWidth: ResponsiveLayout.maxContentWidth())
                     }
+                    .frame(maxWidth: .infinity)
+                    
+                    Spacer()
+                        .frame(height: BrandSpacing.xxxl)
                 }
-                .padding(.horizontal, BrandSpacing.xl)
             }
             
+            // Fixed Bottom Button - White background, black text, NO glow
+            VStack {
+                Button(action: {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        hasStarted = true
+                        viewModel.startInterestTimer()
+                    }
+                }) {
+                    HStack(spacing: BrandSpacing.sm) {
+                        Text("開始")
+                            .font(BrandTypography.headline)
+                            .fontWeight(.bold)
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 16, weight: .bold))
+                    }
+                    .foregroundColor(BrandColors.invertedText) // Black text
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50) // Fixed height
+                    .background(BrandColors.primaryText) // White background
+                    .clipShape(Capsule()) // Pill shape
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, ResponsiveLayout.horizontalPadding())
+                .padding(.bottom, BrandSpacing.lg)
+                .padding(.top, BrandSpacing.md)
+                .background(BrandColors.background) // Pure black background for button area
+                .frame(maxWidth: ResponsiveLayout.maxContentWidth())
+            }
+        }
+    }
+    
+    // MARK: - Keywords Selection Screen
+    private var keywordsSelectionScreen: some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(spacing: BrandSpacing.xxl) {
                     VStack(spacing: BrandSpacing.md) {
-                        if !viewModel.selectedInterests.isEmpty {
+                        Text("我喜歡的事")
+                            .font(BrandTypography.largeTitle)
+                            .foregroundColor(BrandColors.primaryText)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, ResponsiveLayout.horizontalPadding())
+                            .padding(.top, BrandSpacing.xxxl)
+                        
+                        if viewModel.isTimerActive {
+                            // Timer Card - Dark charcoal, yellow timer, white text
+                            HStack(spacing: BrandSpacing.sm) {
+                                Image(systemName: "timer")
+                                    .foregroundColor(BrandColors.brandAccent) // Golden yellow
+                                    .font(.system(size: 18))
+                                Text("剩餘時間：\(viewModel.timeRemaining)秒")
+                                    .font(.system(size: 24, weight: .heavy, design: .monospaced))
+                                    .foregroundColor(BrandColors.primaryText) // Pure white
+                            }
+                            .padding(BrandSpacing.lg)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(BrandColors.surface) // #1C1C1E
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(BrandColors.actionAccent.opacity(0.3), lineWidth: 1)
+                                    )
+                            )
+                            .padding(.horizontal, ResponsiveLayout.horizontalPadding())
+                        } else if viewModel.showConfirmButton {
+                            Text("時間到！請點擊「確認」進入下一步")
+                                .font(BrandTypography.subheadline)
+                                .foregroundColor(BrandColors.primaryText) // Pure white
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, ResponsiveLayout.horizontalPadding())
+                        }
+                    }
+                    
+                    // Keywords Grid
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 100))], spacing: BrandSpacing.md) {
+                        ForEach(viewModel.availableKeywords, id: \.self) { keyword in
+                            KeywordButton(
+                                keyword: keyword,
+                                isSelected: viewModel.selectedInterests.contains(keyword),
+                                action: {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                        viewModel.selectInterest(keyword)
+                                    }
+                                }
+                            )
+                        }
+                    }
+                    .padding(.horizontal, ResponsiveLayout.horizontalPadding())
+                    .frame(maxWidth: ResponsiveLayout.maxContentWidth())
+                    
+                    // Selected Keywords
+                    if !viewModel.selectedInterests.isEmpty {
+                        VStack(spacing: BrandSpacing.md) {
                             Text("已選擇：\(viewModel.selectedInterests.count)個")
                                 .font(BrandTypography.subheadline)
                                 .foregroundColor(BrandColors.secondaryText)
@@ -164,77 +223,88 @@ struct InterestsSelectionView: View {
                                         SelectedKeywordChip(keyword: interest)
                                     }
                                 }
-                                .padding(.horizontal, BrandSpacing.xl)
+                                .padding(.horizontal, ResponsiveLayout.horizontalPadding())
                             }
                         }
-                        
-                        // Action buttons
-                        // Only show buttons when timer ends or user can confirm
-                        if viewModel.showConfirmButton || (!viewModel.isTimerActive && !viewModel.selectedInterests.isEmpty) {
-                            HStack(spacing: BrandSpacing.md) {
-                                // Reset button - only show when timer ends
-                                Button(action: {
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                        viewModel.resetInterestSelection()
-                                    }
-                                }) {
-                                    HStack(spacing: BrandSpacing.xs) {
-                                        Image(systemName: "arrow.counterclockwise")
-                                        Text("重新開始")
-                                    }
-                                    .font(BrandTypography.headline)
-                                    .foregroundColor(BrandColors.primaryBlue)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, BrandSpacing.lg)
-                                    .background(BrandColors.primaryBlue.opacity(0.1))
-                                    .cornerRadius(BrandRadius.medium)
-                                }
-                                .buttonStyle(.plain)
-                                
-                                // Confirm button - show when timer ends or user can confirm anytime
-                                Button(action: {
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                        viewModel.confirmInterestSelection()
-                                    }
-                                }) {
-                                    HStack(spacing: BrandSpacing.sm) {
-                                        Text("確認")
-                                        Image(systemName: "checkmark.circle.fill")
-                                    }
-                                    .font(BrandTypography.headline)
-                                    .foregroundColor(.white)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, BrandSpacing.lg)
-                                    .background(BrandColors.primaryGradient)
-                                    .cornerRadius(BrandRadius.medium)
-                                    .shadow(color: BrandColors.primaryBlue.opacity(0.3), radius: 8, x: 0, y: 4)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                            .padding(.horizontal, BrandSpacing.xl)
-                        }
+                        .padding(.top, BrandSpacing.lg)
+                        .frame(maxWidth: ResponsiveLayout.maxContentWidth())
+                        .padding(.horizontal, ResponsiveLayout.horizontalPadding())
                     }
-                    .padding(.bottom, BrandSpacing.xxxl)
+                    
+                    // Action Buttons
+                    if viewModel.showConfirmButton || (!viewModel.isTimerActive && !viewModel.selectedInterests.isEmpty) {
+                        HStack(spacing: BrandSpacing.md) {
+                            // Reset Button
+                            Button(action: {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                    viewModel.resetInterestSelection()
+                                }
+                            }) {
+                                HStack(spacing: BrandSpacing.xs) {
+                                    Image(systemName: "arrow.counterclockwise")
+                                    Text("重新開始")
+                                }
+                                .font(BrandTypography.headline)
+                                .foregroundColor(BrandColors.actionAccent) // Purple text
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 50)
+                                .background(BrandColors.surface) // Dark charcoal
+                                .cornerRadius(BrandRadius.large)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: BrandRadius.large)
+                                        .stroke(BrandColors.borderColor, lineWidth: 1)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            
+                            // Confirm Button - White background, black text, NO glow
+                            Button(action: {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                    viewModel.confirmInterestSelection()
+                                }
+                            }) {
+                                HStack(spacing: BrandSpacing.sm) {
+                                    Text("確認")
+                                        .font(BrandTypography.headline)
+                                        .fontWeight(.bold)
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 16, weight: .bold))
+                                }
+                                .foregroundColor(BrandColors.invertedText) // Black text
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 50)
+                                .background(BrandColors.primaryText) // White background
+                                .clipShape(Capsule()) // Pill shape
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(.horizontal, ResponsiveLayout.horizontalPadding())
+                        .padding(.top, BrandSpacing.lg)
+                        .padding(.bottom, 100) // Space for fixed button if needed
+                        .frame(maxWidth: ResponsiveLayout.maxContentWidth())
+                    }
+                }
+                .frame(maxWidth: .infinity)
+            }
+            
+            // Fixed Bottom Button (if needed)
+            if viewModel.showConfirmButton || (!viewModel.isTimerActive && !viewModel.selectedInterests.isEmpty) {
+                // Buttons are already in ScrollView, no fixed button needed
+            }
         }
     }
 }
 
+// MARK: - Keyword Button (Dark Mode Neon-Minimalist)
 struct KeywordButton: View {
     let keyword: String
     let isSelected: Bool
     let action: () -> Void
     
-    // Get color based on keyword hash
     private var keywordColor: Color {
         let hash = keyword.hashValue
         let colors = BrandColors.keywordColors
         return colors[abs(hash) % colors.count]
-    }
-    
-    private var keywordGradient: LinearGradient {
-        let gradients = BrandColors.colorfulGradients
-        let hash = keyword.hashValue
-        return gradients[abs(hash) % gradients.count]
     }
     
     var body: some View {
@@ -246,67 +316,32 @@ struct KeywordButton: View {
             Text(keyword)
                 .font(BrandTypography.subheadline)
                 .fontWeight(.medium)
-                .foregroundColor(isSelected ? .white : BrandColors.primaryText)
+                .foregroundColor(isSelected ? BrandColors.primaryText : BrandColors.primaryText) // Always white text
                 .padding(.horizontal, BrandSpacing.lg)
                 .padding(.vertical, BrandSpacing.md)
                 .background(
                     Group {
                         if isSelected {
-                            keywordGradient
+                            // Selected: Purple background
+                            BrandColors.actionAccent // #8B5CF6
                         } else {
-                            LinearGradient(
-                                colors: [keywordColor.opacity(0.2), keywordColor.opacity(0.1)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
+                            // Unselected: Dark charcoal with subtle border
+                            BrandColors.surface // #1C1C1E
                         }
                     }
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: BrandRadius.large)
-                        .stroke(isSelected ? Color.clear : keywordColor.opacity(0.3), lineWidth: 1.5)
+                        .stroke(
+                            isSelected ? Color.clear : keywordColor.opacity(0.3),
+                            lineWidth: isSelected ? 0 : 1
+                        )
                 )
                 .cornerRadius(BrandRadius.large)
-                .shadow(
-                    color: isSelected ? keywordColor.opacity(0.4) : BrandShadow.small.color,
-                    radius: isSelected ? 8 : BrandShadow.small.radius,
-                    x: 0,
-                    y: isSelected ? 4 : BrandShadow.small.y
-                )
+                // NO shadow, NO glow - clean and flat
                 .scaleEffect(isSelected ? 1.05 : 1.0)
         }
         .buttonStyle(.plain)
-    }
-}
-
-struct SelectedKeywordChip: View {
-    let keyword: String
-    
-    private var keywordColor: Color {
-        let hash = keyword.hashValue
-        let colors = BrandColors.keywordColors
-        return colors[abs(hash) % colors.count]
-    }
-    
-    var body: some View {
-        HStack(spacing: BrandSpacing.xs) {
-            Text(keyword)
-                .font(BrandTypography.caption)
-            Image(systemName: "checkmark.circle.fill")
-                .font(.caption2)
-        }
-        .foregroundColor(.white)
-        .padding(.horizontal, BrandSpacing.md)
-        .padding(.vertical, BrandSpacing.xs)
-        .background(
-            LinearGradient(
-                colors: [keywordColor, keywordColor.opacity(0.8)],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-        )
-        .cornerRadius(BrandRadius.large)
-        .shadow(color: keywordColor.opacity(0.3), radius: 4, x: 0, y: 2)
     }
 }
 

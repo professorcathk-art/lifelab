@@ -10,147 +10,212 @@ struct BasicInfoView: View {
     @State private var selectedFamilyStatus: BasicUserInfo.FamilyStatus? = nil
     @State private var selectedEducation: BasicUserInfo.EducationLevel? = nil
     
-    // Common regions
-    let regions = ["香港", "台灣", "中國大陸", "新加坡", "美國", "加拿大", "澳洲", "英國", "其他"]
+    // Common regions - Expanded list
+    let regions = [
+        "香港", "台灣", "中國大陸", "新加坡", "馬來西亞", "泰國", "日本", "韓國",
+        "美國", "加拿大", "澳洲", "紐西蘭", "英國", "愛爾蘭", "法國", "德國", "荷蘭", "瑞士", "西班牙", "義大利",
+        "其他"
+    ]
     
     var body: some View {
         ZStack {
-            // Modern gradient background
-            LinearGradient(
-                colors: [
-                    Color(hex: "667eea").opacity(0.1),
-                    Color(hex: "764ba2").opacity(0.1),
-                    Color(hex: "f093fb").opacity(0.1)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+            // Pure black background - NO gradients
+            BrandColors.background
+                .ignoresSafeArea()
             
-            ScrollView {
-                VStack(spacing: BrandSpacing.xl) {
-                    VStack(spacing: BrandSpacing.lg) {
-                        // Icon
-                        ZStack {
-                            Circle()
-                                .fill(BrandColors.primaryGradient)
-                                .frame(width: 100, height: 100)
-                            
-                            Image(systemName: "person.text.rectangle.fill")
-                                .font(.system(size: 50))
-                                .foregroundStyle(.white)
-                        }
-                        .shadow(color: BrandColors.primaryBlue.opacity(0.3), radius: 15, x: 0, y: 8)
-                        
-                        VStack(spacing: BrandSpacing.sm) {
-                            Text("基本資料")
-                                .font(.system(size: 32, weight: .bold))
-                                .foregroundColor(BrandColors.primaryText)
-                            
-                            Text("請填寫您的基本資料，這將幫助AI為您提供更精準的建議")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(BrandColors.secondaryText)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, BrandSpacing.xl)
-                        }
-                    }
-                    .padding(.top, BrandSpacing.xxxl)
-                    
-                    VStack(spacing: BrandSpacing.lg) {
-                        // Region
-                        ModernFormField(title: "居住地區 *", icon: "location.fill") {
-                            Picker("居住地區", selection: $selectedRegion) {
-                                Text("請選擇").tag("")
-                                ForEach(regions, id: \.self) { region in
-                                    Text(region).tag(region)
-                                }
+            VStack(spacing: 0) {
+                ScrollView {
+                    VStack(spacing: BrandSpacing.xxl) {
+                        // Header Section
+                        VStack(spacing: BrandSpacing.lg) {
+                            // Hero Icon - Clean yellow circle, NO glow/shadow
+                            ZStack {
+                                Circle()
+                                    .fill(BrandColors.brandAccent) // #FFC107
+                                    .frame(width: 100, height: 100)
+                                
+                                Image(systemName: "person.text.rectangle.fill")
+                                    .font(.system(size: 50))
+                                    .foregroundColor(BrandColors.invertedText) // Black icon
                             }
-                            .pickerStyle(.menu)
-                        }
-                        
-                        // Age
-                        ModernFormField(title: "年齡 *", icon: "calendar") {
-                            TextField("例如：28", text: $ageText)
-                                .keyboardType(.numberPad)
-                        }
-                        
-                        // Name
-                        ModernFormField(title: "稱呼 *", icon: "person.fill") {
-                            TextField("例如：小明", text: $nameText)
-                        }
-                        
-                        // Occupation
-                        ModernFormField(title: "職業 *", icon: "briefcase.fill") {
-                            TextField("例如：軟體工程師", text: $occupationText)
-                        }
-                        
-                        // Annual Salary (Optional)
-                        ModernFormField(title: "年薪（USD，可選）", icon: "dollarsign.circle.fill") {
-                            HStack {
-                                TextField("例如：50000", text: $salaryText)
-                                    .keyboardType(.numberPad)
-                                Text("USD")
+                            // NO shadow, NO glow - clean and flat
+                            
+                            VStack(spacing: BrandSpacing.sm) {
+                                Text("基本資料")
+                                    .font(BrandTypography.largeTitle)
+                                    .foregroundColor(BrandColors.primaryText) // Pure white
+                                
+                                Text("請填寫您的基本資料，這將幫助AI為您提供更精準的建議")
+                                    .font(BrandTypography.body)
                                     .foregroundColor(BrandColors.secondaryText)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal, ResponsiveLayout.horizontalPadding())
                             }
-                        } footer: {
-                            Text("此資訊僅用於提供更精準的市場分析，不會公開")
-                                .font(BrandTypography.caption)
-                                .foregroundColor(BrandColors.tertiaryText)
                         }
+                        .padding(.top, BrandSpacing.xxxl)
                         
-                        // Family Status
-                        ModernFormField(title: "家庭狀況 *", icon: "house.fill") {
-                            Picker("家庭狀況", selection: $selectedFamilyStatus) {
-                                Text("請選擇").tag(nil as BasicUserInfo.FamilyStatus?)
-                                ForEach(BasicUserInfo.FamilyStatus.allCases, id: \.self) { status in
-                                    Text(status.rawValue).tag(status as BasicUserInfo.FamilyStatus?)
-                                }
+                        // Form Fields
+                        VStack(spacing: BrandSpacing.lg) {
+                            // Region Dropdown
+                            ModernFormField(title: "居住地區 *", icon: "location.fill") {
+                                CustomPicker(
+                                    selection: $selectedRegion,
+                                    placeholder: "請選擇",
+                                    options: regions
+                                )
                             }
-                            .pickerStyle(.menu)
-                        }
-                        
-                        // Education
-                        ModernFormField(title: "學歷 *", icon: "graduationcap.fill") {
-                            Picker("學歷", selection: $selectedEducation) {
-                                Text("請選擇").tag(nil as BasicUserInfo.EducationLevel?)
-                                ForEach(BasicUserInfo.EducationLevel.allCases, id: \.self) { level in
-                                    Text(level.rawValue).tag(level as BasicUserInfo.EducationLevel?)
-                                }
+                            
+                            // Age Input
+                            ModernFormField(title: "年齡 *", icon: "calendar") {
+                                CustomTextField(
+                                    placeholder: "例如：28",
+                                    text: $ageText,
+                                    keyboardType: .numberPad
+                                )
                             }
-                            .pickerStyle(.menu)
+                            
+                            // Name Input
+                            ModernFormField(title: "稱呼 *", icon: "person.fill") {
+                                CustomTextField(
+                                    placeholder: "例如：小明",
+                                    text: $nameText
+                                )
+                            }
+                            
+                            // Occupation Input
+                            ModernFormField(title: "職業 *", icon: "briefcase.fill") {
+                                CustomTextField(
+                                    placeholder: "例如：軟體工程師",
+                                    text: $occupationText
+                                )
+                            }
+                            
+                            // Annual Salary (Optional)
+                            ModernFormField(title: "年薪（USD，可選）", icon: "dollarsign.circle.fill") {
+                                HStack {
+                                    CustomTextField(
+                                        placeholder: "例如：50000",
+                                        text: $salaryText,
+                                        keyboardType: .numberPad
+                                    )
+                                    Text("USD")
+                                        .font(BrandTypography.body)
+                                        .foregroundColor(BrandColors.secondaryText)
+                                }
+                            } footer: {
+                                Text("此資訊僅用於提供更精準的市場分析，不會公開")
+                                    .font(BrandTypography.caption)
+                                    .foregroundColor(BrandColors.tertiaryText)
+                            }
+                            
+                            // Family Status Dropdown
+                            ModernFormField(title: "家庭狀況 *", icon: "house.fill") {
+                                CustomPicker(
+                                    selection: Binding(
+                                        get: { selectedFamilyStatus?.rawValue ?? "" },
+                                        set: { newValue in
+                                            selectedFamilyStatus = BasicUserInfo.FamilyStatus.allCases.first { $0.rawValue == newValue }
+                                        }
+                                    ),
+                                    placeholder: "請選擇",
+                                    options: BasicUserInfo.FamilyStatus.allCases.map { $0.rawValue }
+                                )
+                            }
+                            
+                            // Education Dropdown
+                            ModernFormField(title: "學歷 *", icon: "graduationcap.fill") {
+                                CustomPicker(
+                                    selection: Binding(
+                                        get: { selectedEducation?.rawValue ?? "" },
+                                        set: { newValue in
+                                            selectedEducation = BasicUserInfo.EducationLevel.allCases.first { $0.rawValue == newValue }
+                                        }
+                                    ),
+                                    placeholder: "請選擇",
+                                    options: BasicUserInfo.EducationLevel.allCases.map { $0.rawValue }
+                                )
+                            }
                         }
+                        .padding(.horizontal, ResponsiveLayout.horizontalPadding())
+                        .padding(.bottom, 100) // Space for fixed button
+                        .frame(maxWidth: ResponsiveLayout.maxContentWidth())
                     }
-                    .padding(.horizontal, BrandSpacing.xl)
-                    .padding(.bottom, BrandSpacing.md)
-                    
-                    // Continue Button
+                    .frame(maxWidth: .infinity)
+                }
+                
+                // Fixed Bottom Button
+                VStack {
                     Button(action: {
-                        saveBasicInfo()
-                        viewModel.moveToNextStep()
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            saveBasicInfo()
+                            viewModel.moveToNextStep()
+                        }
                     }) {
                         HStack(spacing: BrandSpacing.sm) {
                             Text("繼續")
-                                .font(.system(size: 18, weight: .semibold))
+                                .font(BrandTypography.headline)
+                                .fontWeight(.bold)
                             Image(systemName: "arrow.right")
-                                .font(.system(size: 16, weight: .semibold))
+                                .font(.system(size: 16, weight: .bold))
                         }
-                        .foregroundColor(.white)
+                        .foregroundColor(BrandColors.invertedText) // Black text
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, BrandSpacing.lg)
-                        .background(
-                            canContinue ?
-                            BrandColors.primaryGradient :
-                            LinearGradient(colors: [BrandColors.tertiaryBackground], startPoint: .top, endPoint: .bottom)
-                        )
-                        .cornerRadius(16)
-                        .shadow(color: canContinue ? BrandColors.primaryBlue.opacity(0.3) : .clear, radius: 15, x: 0, y: 8)
+                        .frame(height: 50) // Fixed height
+                        .background(BrandColors.primaryText) // White background
+                        .clipShape(Capsule()) // Pill shape
                     }
                     .buttonStyle(.plain)
                     .disabled(!canContinue)
-                    .padding(.horizontal, BrandSpacing.xl)
-                    .padding(.bottom, BrandSpacing.xxxl)
+                    .opacity(canContinue ? 1.0 : 0.5)
+                    .padding(.horizontal, ResponsiveLayout.horizontalPadding())
+                    .padding(.bottom, BrandSpacing.lg)
+                    .padding(.top, BrandSpacing.md)
+                    .background(BrandColors.background) // Pure black background for button area
+                    .frame(maxWidth: ResponsiveLayout.maxContentWidth())
                 }
             }
+        }
+        .preferredColorScheme(ThemeManager.shared.isDarkMode ? .dark : .light)
+        .onAppear {
+            // Load existing data from viewModel when view appears (for review mode)
+            if let region = viewModel.basicInfo.region, !region.isEmpty {
+                selectedRegion = region
+            }
+            if let age = viewModel.basicInfo.age {
+                ageText = String(age)
+            }
+            if let name = viewModel.basicInfo.name, !name.isEmpty {
+                nameText = name
+            }
+            if let occupation = viewModel.basicInfo.occupation, !occupation.isEmpty {
+                occupationText = occupation
+            }
+            if let salary = viewModel.basicInfo.annualSalaryUSD {
+                salaryText = String(salary)
+            }
+            selectedFamilyStatus = viewModel.basicInfo.familyStatus
+            selectedEducation = viewModel.basicInfo.education
+        }
+        .onChange(of: selectedRegion) { _ in
+            saveBasicInfo()
+        }
+        .onChange(of: ageText) { _ in
+            saveBasicInfo()
+        }
+        .onChange(of: nameText) { _ in
+            saveBasicInfo()
+        }
+        .onChange(of: occupationText) { _ in
+            saveBasicInfo()
+        }
+        .onChange(of: salaryText) { _ in
+            saveBasicInfo()
+        }
+        .onChange(of: selectedFamilyStatus) { _ in
+            saveBasicInfo()
+        }
+        .onChange(of: selectedEducation) { _ in
+            saveBasicInfo()
         }
     }
     
@@ -177,7 +242,7 @@ struct BasicInfoView: View {
     }
 }
 
-// Modern Form Field Component
+// MARK: - Modern Form Field Component (Dark Mode Neon-Minimalist)
 struct ModernFormField<Content: View, Footer: View>: View {
     let title: String
     let icon: String
@@ -193,29 +258,138 @@ struct ModernFormField<Content: View, Footer: View>: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: BrandSpacing.sm) {
+            // Label with purple icon and white text
             HStack(spacing: BrandSpacing.sm) {
                 Image(systemName: icon)
-                    .foregroundColor(BrandColors.primaryBlue)
+                    .foregroundColor(BrandColors.actionAccent) // Purple #8B5CF6
                     .font(.system(size: 16))
                 Text(title)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(BrandColors.primaryText)
+                    .font(BrandTypography.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(BrandColors.primaryText) // Pure white
             }
             
+            // Input field content
             content()
-                .padding(BrandSpacing.md)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(BrandColors.secondaryBackground)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(BrandColors.primaryBlue.opacity(0.2), lineWidth: 1)
-                        )
-                )
             
+            // Footer if provided
             if !(footer() is EmptyView) {
                 footer()
             }
+        }
+    }
+}
+
+// MARK: - Custom Text Field (Dark Mode)
+struct CustomTextField: View {
+    let placeholder: String
+    @Binding var text: String
+    var keyboardType: UIKeyboardType = .default
+    @FocusState private var isFocused: Bool
+    
+    var body: some View {
+        ZStack(alignment: .leading) {
+            // Placeholder text (shown when empty)
+            if text.isEmpty {
+                Text(placeholder)
+                    .font(BrandTypography.body)
+                    .foregroundColor(Color(hex: "8E8E93")) // Light gray #8E8E93 for placeholder
+                    .padding(.horizontal, BrandSpacing.md)
+            }
+            
+            TextField("", text: $text)
+                .keyboardType(keyboardType)
+                .autocapitalization(.none)
+                .autocorrectionDisabled()
+                .foregroundColor(BrandColors.primaryText) // Pure white text
+                .font(BrandTypography.body)
+                .focused($isFocused)
+                .padding(.horizontal, BrandSpacing.md)
+        }
+        .frame(height: 50) // Fixed height for better tap target
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(BrandColors.surface) // #1C1C1E
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(isFocused ? BrandColors.actionAccent.opacity(0.5) : BrandColors.borderColor, lineWidth: 1)
+        )
+        .accentColor(BrandColors.actionAccent) // Purple cursor
+    }
+}
+
+// MARK: - Custom Picker (Dark Mode - Looks like Input Field)
+struct CustomPicker: View {
+    @Binding var selection: String
+    let placeholder: String
+    let options: [String]
+    @State private var showPicker = false
+    
+    var body: some View {
+        Button(action: {
+            showPicker = true
+        }) {
+            HStack {
+                Text(selection.isEmpty ? placeholder : selection)
+                    .font(BrandTypography.body)
+                    .foregroundColor(selection.isEmpty ? Color(hex: "8E8E93") : BrandColors.primaryText) // Placeholder: #8E8E93, Selected: white
+                
+                Spacer()
+                
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(BrandColors.actionAccent) // Purple chevron
+            }
+            .frame(height: 50) // Fixed height
+            .padding(.horizontal, BrandSpacing.md)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(BrandColors.surface) // #1C1C1E
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(BrandColors.borderColor, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .sheet(isPresented: $showPicker) {
+            NavigationStack {
+                List {
+                    ForEach(options, id: \.self) { option in
+                        Button(action: {
+                            selection = option
+                            showPicker = false
+                        }) {
+                            HStack {
+                                Text(option)
+                                    .foregroundColor(BrandColors.primaryText)
+                                Spacer()
+                                if selection == option {
+                                    Image(systemName: "checkmark")
+                                        .foregroundColor(BrandColors.actionAccent)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle()) // Expand tap area to entire row
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .background(BrandColors.background)
+                .scrollContentBackground(.hidden)
+                .navigationTitle("選擇")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("完成") {
+                            showPicker = false
+                        }
+                        .foregroundColor(BrandColors.actionAccent)
+                    }
+                }
+            }
+            .preferredColorScheme(ThemeManager.shared.isDarkMode ? .dark : .light)
         }
     }
 }

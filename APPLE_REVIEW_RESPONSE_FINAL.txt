@@ -1,0 +1,36 @@
+1. Please clarify does your app use third-party AI service?
+
+Yes. Our app uses AIML API (api.aimlapi.com) with Anthropic Claude Sonnet 4.5 model to generate personalized career guidance and life blueprint recommendations.
+
+2. If yes, please clarify what personal data does it collect and/or sent to the third-parties AI service?
+
+Data sent to AI service (only for generating recommendations):
+- Basic info (optional): Region, age, occupation, salary, family status, education
+- Interests: User-selected keywords
+- Strengths: Selected keywords and questionnaire answers
+- Values: Core values ranking and reflection answers
+- Deepening data (optional): Flow diary entries, resource inventory, acquired strengths
+
+Important:
+- No PII sent: No names, emails, device IDs, or authentication tokens
+- HTTPS encrypted transmission
+- Data sent only when user clicks "開啟我的理想人生" button
+- Not used for training (per AIML API privacy policy)
+
+Data NOT sent: Authentication credentials, email addresses, device identifiers, payment information.
+
+3. Please clarify does the app obtain user's consent before sending their data?
+
+Yes. Consent is obtained through:
+
+1. Explicit user action: User must click "開啟我的理想人生" button to generate life blueprint. The Payment page clearly states "解鎖專屬 AI 深度分析" (Unlock exclusive AI deep analysis), indicating AI will process their data.
+
+2. Transparent disclosure: Before data collection, users see: "請填寫您的基本資料，這將幫助AI為您提供更精準的建議" (Please fill in your basic information, which will help AI provide more accurate recommendations), indicating data will be used for AI analysis.
+
+3. Privacy Policy: Available in App Store Connect and explains AI service usage.
+
+4. User control: Users can delete account/data anytime via Settings → Account → Delete Account.
+
+5. Data transmission: Life blueprint generation (main AI feature) requires explicit button click. AI summary is generated when user proceeds to AI summary step after completing questionnaire (user voluntarily continues through flow).
+
+Consent flow: User fills information → Sees AI usage notices → Clicks "開啟我的理想人生" button (explicit consent) → Data sent to AI → Receives recommendations

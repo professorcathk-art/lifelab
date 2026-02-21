@@ -15,9 +15,9 @@ class PaymentService: ObservableObject {
     
     // Product IDs (must match App Store Connect configuration)
     private let productIDs: [String] = [
-        "com.resonance.lifelab.yearly",
-        "com.resonance.lifelab.quarterly",
-        "com.resonance.lifelab.monthly"
+        "com.resonance.lifelab.annually",    // Annual subscription (USD 89.99/year)
+        "com.resonance.lifelab.quarterly",   // Quarterly subscription
+        "com.resonance.lifelab.monthly"       // Monthly subscription
     ]
     
     private init() {
@@ -51,6 +51,7 @@ class PaymentService: ObservableObject {
         defer { isLoading = false }
         
         do {
+            print("🛒 Attempting to purchase: \(product.id) - \(product.displayPrice)")
             let result = try await product.purchase()
             
             switch result {
@@ -58,10 +59,41 @@ class PaymentService: ObservableObject {
                 // Verify the transaction
                 let transaction = try checkVerified(verification)
                 
+                print("✅ Transaction verified: \(transaction.productID)")
+                print("   Transaction ID: \(transaction.id)")
+                print("   Purchase Date: \(transaction.purchaseDate)")
+                
                 // Update purchased products
                 await updatePurchasedProducts()
                 
-                // Finish the transaction
+                // CRITICAL: Save subscription to Supabase FIRST
+                // This ensures SubscriptionManager can find the subscription record
+                // Note: transaction.id is UInt64, convert to String
+                await saveSubscriptionToSupabase(productID: transaction.productID, transactionID: String(transaction.id), purchaseDate: transaction.purchaseDate)
+                
+                // CRITICAL: Refresh SubscriptionManager to update hasActiveSubscription
+                // This ensures the subscription check works correctly after purchase
+                await SubscriptionManager.shared.checkSubscriptionStatus()
+                
+                // IMPORTANT: After successful purchase, ensure user data is synced to Supabase
+                // This ensures data persistence and allows data restoration after renewal
+                if let userId = AuthService.shared.currentUser?.id {
+                    Task {
+                        await DataService.shared.syncToSupabase()
+                        print("✅ User data synced to Supabase after purchase")
+                    }
+                }
+                
+                // IMPORTANT: Load user data from Supabase after purchase
+                // This restores any data that was saved during subscription period
+                if let userId = AuthService.shared.currentUser?.id {
+                    Task {
+                        await DataService.shared.loadFromSupabase(userId: userId)
+                        print("✅ User data loaded from Supabase after purchase")
+                    }
+                }
+                
+                // Finish the transaction (important: only finish after verification)
                 await transaction.finish()
                 
                 print("✅ Purchase successful: \(product.id)")
@@ -69,20 +101,24 @@ class PaymentService: ObservableObject {
                 
             case .userCancelled:
                 print("⚠️ User cancelled purchase")
+                errorMessage = nil // Don't show error for user cancellation
                 return false
                 
             case .pending:
                 errorMessage = "購買待處理中，請稍候"
-                print("⚠️ Purchase pending")
+                print("⚠️ Purchase pending - requires approval")
                 return false
                 
             @unknown default:
                 errorMessage = "未知錯誤"
+                print("❌ Unknown purchase result")
                 return false
             }
         } catch {
-            errorMessage = "購買失敗：\(error.localizedDescription)"
-            print("❌ Purchase failed: \(error.localizedDescription)")
+            let errorDescription = error.localizedDescription
+            errorMessage = "購買失敗：\(errorDescription)"
+            print("❌ Purchase failed: \(errorDescription)")
+            print("   Error details: \(error)")
             throw error
         }
     }
@@ -113,6 +149,11 @@ class PaymentService: ObservableObject {
         purchasedProductIDs.contains(productID)
     }
     
+    /// Refresh purchased products (public method for external calls)
+    func refreshPurchasedProducts() async {
+        await updatePurchasedProducts()
+    }
+    
     // MARK: - Private Methods
     
     private func loadPurchasedProducts() async {
@@ -122,10 +163,26 @@ class PaymentService: ObservableObject {
     private func updatePurchasedProducts() async {
         var purchasedIDs: Set<String> = []
         
+        // Check current entitlements (active subscriptions)
         for await result in Transaction.currentEntitlements {
             do {
                 let transaction = try checkVerified(result)
                 purchasedIDs.insert(transaction.productID)
+                print("✅ Found active subscription: \(transaction.productID)")
+            } catch {
+                print("⚠️ Failed to verify transaction: \(error)")
+            }
+        }
+        
+        // Also check all transactions (including non-renewing subscriptions)
+        for await result in Transaction.all {
+            do {
+                let transaction = try checkVerified(result)
+                // Only add if it's a subscription product
+                if productIDs.contains(transaction.productID) {
+                    purchasedIDs.insert(transaction.productID)
+                    print("✅ Found transaction: \(transaction.productID)")
+                }
             } catch {
                 print("⚠️ Failed to verify transaction: \(error)")
             }
@@ -141,6 +198,55 @@ class PaymentService: ObservableObject {
             throw NSError(domain: "PaymentService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Transaction verification failed"])
         case .verified(let safe):
             return safe
+        }
+    }
+    
+    /// Save subscription to Supabase
+    private func saveSubscriptionToSupabase(productID: String, transactionID: String, purchaseDate: Date) async {
+        // Get user ID from AuthService (returns String UUID)
+        guard let userIdString = AuthService.shared.currentUser?.id,
+              let userId = UUID(uuidString: userIdString) else {
+            print("⚠️ Cannot save subscription: User not authenticated or invalid user ID")
+            return
+        }
+        
+        // Determine plan type from product ID
+        let planType: UserSubscription.PlanType
+        if productID.contains("annually") || productID.contains("yearly") {
+            planType = .yearly
+        } else if productID.contains("quarterly") {
+            planType = .quarterly
+        } else {
+            planType = .monthly
+        }
+        
+        // Calculate end date based on plan type
+        let calendar = Calendar.current
+        let endDate: Date
+        switch planType {
+        case .yearly:
+            endDate = calendar.date(byAdding: .year, value: 1, to: purchaseDate) ?? purchaseDate
+        case .quarterly:
+            endDate = calendar.date(byAdding: .month, value: 3, to: purchaseDate) ?? purchaseDate
+        case .monthly:
+            endDate = calendar.date(byAdding: .month, value: 1, to: purchaseDate) ?? purchaseDate
+        }
+        
+        let subscription = UserSubscription(
+            id: UUID(),
+            userId: userId,
+            planType: planType,
+            status: .active,
+            startDate: purchaseDate,
+            endDate: endDate
+        )
+        
+        do {
+            try await SupabaseService.shared.saveUserSubscription(subscription)
+            print("✅ Subscription saved to Supabase: \(planType.rawValue) plan for user \(userIdString)")
+        } catch {
+            print("⚠️ Failed to save subscription to Supabase: \(error.localizedDescription)")
+            // Don't throw - subscription is still valid even if Supabase save fails
         }
     }
 }

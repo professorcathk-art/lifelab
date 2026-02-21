@@ -15,51 +15,57 @@ struct AISummaryView: View {
                         .font(BrandTypography.subheadline)
                         .foregroundColor(BrandColors.secondaryText)
                         .multilineTextAlignment(.center)
+                        .padding(.horizontal, ResponsiveLayout.horizontalPadding())
                 }
                 .padding(.top, BrandSpacing.xxxl)
+                .frame(maxWidth: ResponsiveLayout.maxContentWidth())
+                .padding(.horizontal, ResponsiveLayout.horizontalPadding())
                 
-                if viewModel.isLoadingSummary {
-                    VStack(spacing: BrandSpacing.lg) {
-                        ProgressView()
-                            .scaleEffect(1.5)
-                            .tint(BrandColors.primaryBlue)
-                        Text("正在生成AI分析總結...")
-                            .font(BrandTypography.subheadline)
-                            .foregroundColor(BrandColors.secondaryText)
-                        Text("這可能需要幾秒鐘時間")
-                            .font(BrandTypography.caption)
-                            .foregroundColor(BrandColors.tertiaryText)
+                Group {
+                    if viewModel.isLoadingSummary {
+                        VStack(spacing: BrandSpacing.lg) {
+                            ProgressView()
+                                .scaleEffect(1.5)
+                                .tint(BrandColors.primaryBlue)
+                            Text("正在生成AI分析總結...")
+                                .font(BrandTypography.subheadline)
+                                .foregroundColor(BrandColors.secondaryText)
+                            Text("這可能需要幾秒鐘時間")
+                                .font(BrandTypography.caption)
+                                .foregroundColor(BrandColors.tertiaryText)
+                        }
+                        .padding(.vertical, 60)
+                    } else if viewModel.aiSummary.isEmpty {
+                        VStack(spacing: BrandSpacing.lg) {
+                            Image(systemName: "exclamationmark.triangle")
+                                .font(.system(size: 40))
+                                .foregroundColor(BrandColors.warning)
+                            Text("無法生成總結")
+                                .font(BrandTypography.headline)
+                                .foregroundColor(BrandColors.primaryText)
+                            Text("請檢查網絡連接或稍後再試")
+                                .font(BrandTypography.subheadline)
+                                .foregroundColor(BrandColors.secondaryText)
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding(.vertical, 60)
+                    } else {
+                        VStack(alignment: .leading, spacing: BrandSpacing.lg) {
+                            // Parse and display markdown properly
+                            Text(parseMarkdown(viewModel.aiSummary))
+                                .font(BrandTypography.body)
+                                .foregroundColor(BrandColors.primaryText)
+                                .lineSpacing(8)
+                        }
+                        .padding(BrandSpacing.xl)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(BrandColors.secondaryBackground)
+                        .cornerRadius(BrandRadius.medium)
+                        .shadow(color: BrandShadow.medium.color, radius: BrandShadow.medium.radius, x: BrandShadow.medium.x, y: BrandShadow.medium.y)
+                        .padding(.horizontal, ResponsiveLayout.horizontalPadding())
                     }
-                    .padding(.vertical, 60)
-                } else if viewModel.aiSummary.isEmpty {
-                    VStack(spacing: BrandSpacing.lg) {
-                        Image(systemName: "exclamationmark.triangle")
-                            .font(.system(size: 40))
-                            .foregroundColor(BrandColors.warning)
-                        Text("無法生成總結")
-                            .font(BrandTypography.headline)
-                            .foregroundColor(BrandColors.primaryText)
-                        Text("請檢查網絡連接或稍後再試")
-                            .font(BrandTypography.subheadline)
-                            .foregroundColor(BrandColors.secondaryText)
-                            .multilineTextAlignment(.center)
-                    }
-                    .padding(.vertical, 60)
-                } else {
-                    VStack(alignment: .leading, spacing: BrandSpacing.lg) {
-                        // Parse and display markdown properly
-                        Text(parseMarkdown(viewModel.aiSummary))
-                            .font(BrandTypography.body)
-                            .foregroundColor(BrandColors.primaryText)
-                            .lineSpacing(8)
-                    }
-                    .padding(BrandSpacing.xl)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(BrandColors.secondaryBackground)
-                    .cornerRadius(BrandRadius.medium)
-                    .shadow(color: BrandShadow.medium.color, radius: BrandShadow.medium.radius, x: BrandShadow.medium.x, y: BrandShadow.medium.y)
-                    .padding(.horizontal, BrandSpacing.xl)
                 }
+                .frame(maxWidth: ResponsiveLayout.maxContentWidth())
                 
                 // Next button - goes to loading animation
                 if !viewModel.aiSummary.isEmpty {
@@ -69,22 +75,25 @@ struct AISummaryView: View {
                     }) {
                         HStack(spacing: BrandSpacing.sm) {
                             Text("下一題")
+                                .font(BrandTypography.headline)
+                                .fontWeight(.bold)
                             Image(systemName: "arrow.right")
+                                .font(.system(size: 16, weight: .bold))
                         }
-                        .font(BrandTypography.headline)
-                        .foregroundColor(.white)
+                        .foregroundColor(BrandColors.invertedText) // Black text on white button
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, BrandSpacing.lg)
-                        .background(BrandColors.primaryGradient)
-                        .cornerRadius(BrandRadius.medium)
-                        .shadow(color: BrandColors.primaryBlue.opacity(0.3), radius: 8, x: 0, y: 4)
+                        .frame(height: 50)
+                        .background(BrandColors.primaryText) // White background
+                        .clipShape(Capsule()) // Pill shape
                     }
                     .buttonStyle(.plain)
-                    .padding(.horizontal, BrandSpacing.xl)
+                    .padding(.horizontal, ResponsiveLayout.horizontalPadding())
                     .padding(.top, BrandSpacing.xxl)
                     .padding(.bottom, BrandSpacing.xxxl)
+                    .frame(maxWidth: ResponsiveLayout.maxContentWidth())
                 }
             }
+            .frame(maxWidth: .infinity)
         }
     }
 }

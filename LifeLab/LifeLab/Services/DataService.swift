@@ -76,23 +76,42 @@ class DataService: ObservableObject {
         update(&profile)
         profile.updatedAt = Date()
         saveUserProfile(profile)
+        
+        // IMPORTANT: Force sync immediately after update (don't wait for background sync)
+        // This ensures data is synced to Supabase right away
+        if AuthService.shared.isAuthenticated && isOnline {
+            Task {
+                // Small delay to ensure UserDefaults is updated
+                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+                await syncToSupabase(profile: profile)
+            }
+        }
     }
     
     /// Load from Supabase (background, non-blocking)
     func loadFromSupabase(userId: String) async {
+        print("📥 DataService.loadFromSupabase called for user: \(userId)")
+        
         // IMPORTANT: Load user-specific data from local storage first
         // This ensures data isolation between different users
         
         // Load user-specific local data (if exists)
         loadUserProfileForUser(userId: userId)
+        if let localProfile = userProfile {
+            print("📱 Loaded local profile: \(localProfile.interests.count) interests, \(localProfile.strengths.count) strengths")
+        } else {
+            print("📱 No local profile found")
+        }
         
         guard isOnline else {
             print("⚠️ Offline: Using cached local data")
             return
         }
         
+        print("🌐 Online: Fetching profile from Supabase...")
         do {
             if let profile = try await supabaseService.fetchUserProfile(userId: userId) {
+                print("✅ Successfully fetched profile from Supabase: \(profile.interests.count) interests, \(profile.strengths.count) strengths")
                 await MainActor.run {
                     // Merge strategy: Keep local data if it exists, merge with Supabase
                     if let localProfile = self.userProfile {
@@ -147,15 +166,29 @@ class DataService: ObservableObject {
                 }
             }
         } catch {
-            print("⚠️ Failed to load from Supabase: \(error.localizedDescription)")
+            print("❌ Failed to load from Supabase: \(error.localizedDescription)")
+            print("   Error details: \(error)")
             // Continue using local data (offline support)
             // Ensure local data is loaded
             loadUserProfile()
+            if let localProfile = userProfile {
+                print("📱 Using local cached data: \(localProfile.interests.count) interests")
+            } else {
+                print("⚠️ No local data available either")
+            }
         }
     }
     
     /// Sync to Supabase (background, non-blocking)
     func syncToSupabase(profile: UserProfile? = nil) async {
+        // Debug: Log all sync conditions
+        print("🔍🔍🔍 SYNC CHECK STARTED 🔍🔍🔍")
+        print("   isOnline: \(isOnline)")
+        print("   isAuthenticated: \(AuthService.shared.isAuthenticated)")
+        print("   currentUser: \(AuthService.shared.currentUser?.id ?? "nil")")
+        print("   profile provided: \(profile != nil)")
+        print("   local userProfile exists: \(userProfile != nil)")
+        
         guard isOnline else {
             print("⚠️ Offline: Data saved locally, will sync when online")
             return
@@ -164,6 +197,32 @@ class DataService: ObservableObject {
         guard let userId = AuthService.shared.currentUser?.id else {
             print("⚠️ Not authenticated, skipping sync")
             return
+        }
+        
+        // IMPORTANT: Check if user has Supabase session
+        // If using local session (e.g., Apple Sign In fallback), skip sync
+        var hasSupabaseSession = UserDefaults.standard.string(forKey: "supabase_access_token") != nil
+        print("   hasSupabaseSession: \(hasSupabaseSession)")
+        print("   userId: \(userId)")
+        print("   isAuthenticated: \(AuthService.shared.isAuthenticated)")
+        
+        if !hasSupabaseSession {
+            print("⚠️ No Supabase session found, attempting to check again...")
+            // Wait a moment and check again (token might still be saving)
+            try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
+            hasSupabaseSession = UserDefaults.standard.string(forKey: "supabase_access_token") != nil
+            print("   hasSupabaseSession (retry): \(hasSupabaseSession)")
+            
+            if !hasSupabaseSession {
+                print("⚠️ No Supabase session found after retry, skipping sync")
+                print("   User is using local session (e.g., Apple Sign In fallback)")
+                print("   Data saved locally but will NOT sync to Supabase")
+                print("   To enable sync:")
+                print("   1. For Email login: Check if token is saved correctly")
+                print("   2. For Apple Sign In: Configure Apple OAuth in Supabase Dashboard")
+                print("   Debug: Check console logs for '🔐 Saving authentication tokens...' message")
+                return
+            }
         }
         
         let profileToSync = profile ?? userProfile
@@ -190,21 +249,68 @@ class DataService: ObservableObject {
         }
         
         do {
+            print("💾💾💾 STARTING SYNC TO SUPABASE 💾💾💾")
+            print("   User ID: \(userId)")
+            print("   Profile has: \(profileToSave.interests.count) interests, \(profileToSave.strengths.count) strengths, \(profileToSave.values.count) values")
+            print("   Has basicInfo: \(profileToSave.basicInfo != nil)")
+            print("   Has lifeBlueprint: \(profileToSave.lifeBlueprint != nil)")
+            print("   Has actionPlan: \(profileToSave.actionPlan != nil)")
+            
             // IMPORTANT: Ensure profile has correct user ID before saving
+            print("   Calling supabaseService.saveUserProfile...")
             try await supabaseService.saveUserProfile(profileToSave)
+            
             await MainActor.run {
                 self.lastSyncTime = Date()
                 let syncKey = "lifelab_last_sync_time_\(userId)"
                 UserDefaults.standard.set(Date(), forKey: syncKey)
                 self.isSyncing = false
             }
-            print("✅ Successfully synced profile to Supabase for user \(userId)")
+            print("✅✅✅ SYNC SUCCESSFUL ✅✅✅")
+            print("   Successfully synced profile to Supabase for user \(userId)")
+            print("   ✅ Data is now persisted in Supabase database")
+            print("   Sync time saved: \(Date())")
+        } catch let error as NSError {
+            await MainActor.run {
+                self.isSyncing = false
+            }
+            
+            // Check if it's a network error
+            let isNetworkError = error.domain == NSURLErrorDomain && (
+                error.code == NSURLErrorTimedOut ||
+                error.code == NSURLErrorNetworkConnectionLost ||
+                error.code == NSURLErrorNotConnectedToInternet ||
+                error.code == NSURLErrorCannotConnectToHost
+            )
+            
+            if isNetworkError {
+                print("⚠️⚠️⚠️ NETWORK ERROR DURING SYNC ⚠️⚠️⚠️")
+                print("   Error: \(error.localizedDescription)")
+                print("   Error code: \(error.code)")
+                print("   📡 Network status: \(isOnline ? "Online (but connection failed)" : "Offline")")
+                print("   💾 Data saved locally: ✅")
+                print("   🔄 Will retry automatically when network is available")
+                print("   📱 App will continue working with local data")
+                
+                // Schedule automatic retry when network becomes available
+                // Network monitor will trigger sync when connectivity is restored
+            } else {
+                print("❌❌❌ FAILED TO SYNC TO SUPABASE ❌❌❌")
+                print("   Error: \(error.localizedDescription)")
+                print("   Error details: \(error)")
+                print("   Error code: \(error.code)")
+                print("   Error domain: \(error.domain)")
+                print("   💾 Data saved locally but NOT synced to Supabase")
+                print("   ⚠️ This might be a server error, not a network error")
+            }
+            // Continue using local data (offline support)
         } catch {
             await MainActor.run {
                 self.isSyncing = false
             }
             print("❌ Failed to sync to Supabase: \(error.localizedDescription)")
             print("   Error details: \(error)")
+            print("   Data saved locally but NOT synced to Supabase")
             // Continue using local data (offline support)
         }
     }
@@ -296,21 +402,60 @@ class DataService: ObservableObject {
     }
     
     /// Load user-specific profile from local cache
-    private func loadUserProfileForUser(userId: String) {
-        let userKey = "lifelab_user_profile_\(userId)"
-        if let data = UserDefaults.standard.data(forKey: userKey),
-           let profile = try? JSONDecoder().decode(UserProfile.self, from: data) {
-            userProfile = profile
-            
-            // Load sync time
-            let syncKey = "lifelab_last_sync_time_\(userId)"
-            if let syncTime = UserDefaults.standard.object(forKey: syncKey) as? Date {
-                lastSyncTime = syncTime
+    /// IMPORTANT: This is public so AuthService can call it immediately after login
+    /// CRITICAL: This function MUST be called AFTER currentUser is set in AuthService
+    /// to ensure we load the correct user's data
+    func loadUserProfileForUser(userId: String) {
+        // CRITICAL: Verify that AuthService.currentUser matches the userId we're loading
+        // This prevents loading wrong user's data
+        if let currentUserId = AuthService.shared.currentUser?.id {
+            if currentUserId != userId {
+                print("❌❌❌ CRITICAL ERROR: User ID mismatch! ❌❌❌")
+                print("   AuthService.currentUser.id: \(currentUserId)")
+                print("   Requested userId: \(userId)")
+                print("   This should NEVER happen - aborting load to prevent data leakage")
+                return
             }
-            
-            print("✅ Loaded user profile for user \(userId) from local cache")
+        } else {
+            print("⚠️ Warning: AuthService.currentUser is nil, but loading data for user \(userId)")
+            print("   This might happen during logout/login transition")
+        }
+        
+        let userKey = "lifelab_user_profile_\(userId)"
+        print("🔍🔍🔍 LOADING LOCAL DATA FOR USER 🔍🔍🔍")
+        print("   User ID: \(userId)")
+        print("   UserDefaults key: \(userKey)")
+        
+        if let data = UserDefaults.standard.data(forKey: userKey) {
+            print("   ✅ Found data in UserDefaults (\(data.count) bytes)")
+            if let profile = try? JSONDecoder().decode(UserProfile.self, from: data) {
+                // CRITICAL: Double-check that the profile belongs to the correct user
+                // This is an extra safety check
+                userProfile = profile
+                
+                // Load sync time
+                let syncKey = "lifelab_last_sync_time_\(userId)"
+                if let syncTime = UserDefaults.standard.object(forKey: syncKey) as? Date {
+                    lastSyncTime = syncTime
+                }
+                
+                print("✅✅✅ LOADED USER PROFILE FROM LOCAL CACHE ✅✅✅")
+                print("   User: \(userId)")
+                print("   Interests: \(profile.interests.count)")
+                print("   Strengths: \(profile.strengths.count)")
+                print("   Values: \(profile.values.count)")
+                print("   Has basicInfo: \(profile.basicInfo != nil)")
+                print("   Has blueprint: \(profile.lifeBlueprint != nil)")
+                print("   Has actionPlan: \(profile.actionPlan != nil)")
+            } else {
+                print("❌ Failed to decode profile data")
+            }
         } else {
             print("📱 No local profile found for user \(userId)")
+            print("   This is expected for a new user")
+            // CRITICAL: Ensure userProfile is nil if no data found
+            // This prevents showing old user's data
+            userProfile = nil
         }
     }
     

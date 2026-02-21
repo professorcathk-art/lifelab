@@ -112,9 +112,67 @@ class InitialScanViewModel: ObservableObject {
             currentStep = .aiSummary
             generateAISummary()
         case .aiSummary:
+            // CRITICAL: Check subscription status BEFORE deciding to skip payment
+            // We must verify subscription status, not assume it
+            Task {
+                // Wait for subscription status check to complete
+                await SubscriptionManager.shared.checkSubscriptionStatus()
+                await PaymentService.shared.refreshPurchasedProducts()
+                
+                // CRITICAL: Only use SubscriptionManager's hasActiveSubscription
+                // It checks BOTH StoreKit AND Supabase
+                // Do NOT use paymentService.hasActiveSubscription alone
+                let subscriptionManager = SubscriptionManager.shared
+                let hasActiveSubscription = subscriptionManager.hasActiveSubscription
+                
+                await MainActor.run {
+                    if hasActiveSubscription {
+                        // User has active subscription in BOTH StoreKit AND Supabase
+                        print("✅✅✅ User has VALID subscription (StoreKit + Supabase), skipping payment and generating blueprint")
+                        hasPaid = true // Mark as paid to allow blueprint generation
+                        currentStep = .loading
+                        generateLifeBlueprint()
+                    } else {
+                        // User has NO valid subscription - show payment page
+                        print("❌❌❌ User has NO valid subscription, showing payment page")
+                        print("   SubscriptionManager.hasActiveSubscription: \(subscriptionManager.hasActiveSubscription)")
+                        print("   User MUST pay before generating blueprint")
+                        currentStep = .loading
+                    }
+                }
+            }
+            // Set to loading initially while we check subscription
             currentStep = .loading
         case .loading:
-            currentStep = .payment
+            // CRITICAL: Check subscription status BEFORE deciding to skip payment
+            Task {
+                // Wait for subscription status check to complete
+                await SubscriptionManager.shared.checkSubscriptionStatus()
+                await PaymentService.shared.refreshPurchasedProducts()
+                
+                // CRITICAL: Only use SubscriptionManager's hasActiveSubscription
+                // It checks BOTH StoreKit AND Supabase
+                // Do NOT use paymentService.hasActiveSubscription alone
+                let subscriptionManager = SubscriptionManager.shared
+                let hasActiveSubscription = subscriptionManager.hasActiveSubscription
+                
+                await MainActor.run {
+                    if hasActiveSubscription {
+                        // User has active subscription in BOTH StoreKit AND Supabase
+                        print("✅✅✅ User has VALID subscription (StoreKit + Supabase), skipping payment and generating blueprint")
+                        hasPaid = true // Mark as paid to allow blueprint generation
+                        generateLifeBlueprint()
+                        // Stay on loading while generating
+                    } else {
+                        // User has NO valid subscription - show payment page
+                        print("❌❌❌ User has NO valid subscription, showing payment page")
+                        print("   SubscriptionManager.hasActiveSubscription: \(subscriptionManager.hasActiveSubscription)")
+                        print("   User MUST pay before generating blueprint")
+                        currentStep = .payment
+                    }
+                }
+            }
+            // Stay on loading while checking subscription
         case .payment:
             // Payment completion triggers blueprint generation directly
             break
@@ -169,6 +227,19 @@ class InitialScanViewModel: ObservableObject {
             }
         default:
             break
+        }
+    }
+    
+    // MARK: - Review Mode Navigation (doesn't reset data)
+    func goToStepReviewMode(_ step: InitialScanStep) {
+        stopTimer()
+        // IMPORTANT: In review mode, don't reinitialize data - just navigate
+        // Data is already loaded from profile, user can review and edit
+        currentStep = step
+        
+        // Only regenerate AI summary if it's empty and user is viewing that step
+        if step == .aiSummary && aiSummary.isEmpty {
+            generateAISummary()
         }
     }
     
@@ -349,10 +420,24 @@ class InitialScanViewModel: ObservableObject {
         isLoadingBlueprint = true
         Task {
             do {
-                var profile = UserProfile()
-                profile.interests = selectedInterests
-                profile.strengths = strengths
-                profile.values = selectedValues.filter { $0.rank > 0 && !$0.isGreyedOut }
+                // Use complete user profile from DataService to include ALL data (including deepening exploration data)
+                var profile: UserProfile
+                if let existingProfile = DataService.shared.userProfile {
+                    // Use existing profile with ALL data
+                    profile = existingProfile
+                    // Update with current form data
+                    profile.basicInfo = basicInfo
+                    profile.interests = selectedInterests
+                    profile.strengths = strengths
+                    profile.values = selectedValues.filter { $0.rank > 0 && !$0.isGreyedOut }
+                } else {
+                    // Fallback: create new profile with current data
+                    profile = UserProfile()
+                    profile.basicInfo = basicInfo
+                    profile.interests = selectedInterests
+                    profile.strengths = strengths
+                    profile.values = selectedValues.filter { $0.rank > 0 && !$0.isGreyedOut }
+                }
                 
                 // Add timeout to prevent infinite loading
                 let blueprint = try await withThrowingTaskGroup(of: LifeBlueprint.self) { group in
@@ -375,7 +460,6 @@ class InitialScanViewModel: ObservableObject {
                     updatedBlueprint.version = 1
                     updatedBlueprint.createdAt = Date()
                     self.lifeBlueprint = updatedBlueprint
-                    self.isLoadingBlueprint = false
                     
                     // Log the blueprint content to verify AI is working
                     print("✅ Saving Version 1 blueprint:")
@@ -384,6 +468,9 @@ class InitialScanViewModel: ObservableObject {
                     print("  - Strengths summary length: \(blueprint.strengthsSummary.count) chars")
                     print("  - Strengths summary preview: \(blueprint.strengthsSummary.prefix(100))...")
                     
+                    // CRITICAL: Save to DataService FIRST, before setting isLoadingBlueprint = false
+                    // This ensures ContentView immediately detects the blueprint and switches to MainTabView
+                    // updateUserProfile is synchronous and will immediately update @Published userProfile
                     DataService.shared.updateUserProfile { profile in
                         profile.lifeBlueprint = updatedBlueprint
                         // Also add to lifeBlueprints array so it shows in ProfileView
@@ -398,10 +485,19 @@ class InitialScanViewModel: ObservableObject {
                             }
                         }
                     }
-                    // Auto-navigate to blueprint after loading completes
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        self.currentStep = .blueprint
+                    
+                    // Sync to Supabase in background (non-blocking)
+                    Task {
+                        await DataService.shared.syncToSupabase()
+                        print("✅ User profile synced to Supabase")
                     }
+                    
+                    // Set loading to false AFTER saving to DataService
+                    // ContentView's hasCompletedInitialScan will immediately become true
+                    // because userProfile is @Published and SwiftUI will automatically re-evaluate
+                    // The view will switch from InitialScanView to MainTabView immediately
+                    self.isLoadingBlueprint = false
+                    print("✅ Blueprint saved to DataService, ContentView will immediately switch to MainTabView")
                 }
             } catch {
                 print("❌❌❌ CRITICAL ERROR: Life blueprint generation failed!")
@@ -418,13 +514,26 @@ class InitialScanViewModel: ObservableObject {
                     print("❌❌❌ Please check Xcode console for API call logs")
                 }
                 
-                // Retry API call once
+                // Retry API call once - use complete profile
                 print("🔄 Retrying API call...")
                 do {
-                    var profile = UserProfile()
-                    profile.interests = selectedInterests
-                    profile.strengths = strengths
-                    profile.values = selectedValues.filter { $0.rank > 0 && !$0.isGreyedOut }
+                    // Use complete user profile from DataService to include ALL data
+                    var profile: UserProfile
+                    if let existingProfile = DataService.shared.userProfile {
+                        profile = existingProfile
+                        // Update with current form data
+                        profile.basicInfo = basicInfo
+                        profile.interests = selectedInterests
+                        profile.strengths = strengths
+                        profile.values = selectedValues.filter { $0.rank > 0 && !$0.isGreyedOut }
+                    } else {
+                        // Fallback: create new profile with current data
+                        profile = UserProfile()
+                        profile.basicInfo = basicInfo
+                        profile.interests = selectedInterests
+                        profile.strengths = strengths
+                        profile.values = selectedValues.filter { $0.rank > 0 && !$0.isGreyedOut }
+                    }
                     
                     let retryBlueprint = try await AIService.shared.generateLifeBlueprint(profile: profile)
                     await MainActor.run {
@@ -485,6 +594,8 @@ class InitialScanViewModel: ObservableObject {
     
     func saveProgress() {
         DataService.shared.updateUserProfile { profile in
+            // IMPORTANT: Save basicInfo as well (was missing before)
+            profile.basicInfo = basicInfo
             profile.interests = selectedInterests
             profile.strengths = strengths
             profile.values = selectedValues.filter { $0.rank > 0 }

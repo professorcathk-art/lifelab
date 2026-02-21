@@ -2,6 +2,7 @@ import SwiftUI
 
 struct TaskManagementView: View {
     @EnvironmentObject var dataService: DataService
+    @EnvironmentObject var themeManager: ThemeManager
     @State private var selectedTab = 0
     @State private var isGeneratingActionPlan = false
     @State private var showFavoriteRequiredAlert = false
@@ -9,6 +10,9 @@ struct TaskManagementView: View {
     @State private var isGeneratingTodayTasks = false
     @State private var isEditingTodayTasks = false
     @State private var editedTodayTasks: [ActionItem] = []
+    @State private var showRegenerateConfirmation = false
+    @State private var showGenerateTodayTasksConfirmation = false
+    @State private var showEmptyTitleAlert = false
     
     var body: some View {
         NavigationStack {
@@ -19,6 +23,8 @@ struct TaskManagementView: View {
                 }
                 .pickerStyle(.segmented)
                 .padding()
+                .frame(maxWidth: ResponsiveLayout.maxContentWidth())
+                .padding(.horizontal, ResponsiveLayout.horizontalPadding())
                 
                 if let actionPlan = dataService.userProfile?.actionPlan {
                     ScrollView {
@@ -30,7 +36,9 @@ struct TaskManagementView: View {
                                     isGenerating: isGeneratingTodayTasks,
                                     isEditing: $isEditingTodayTasks,
                                     editedItems: $editedTodayTasks,
-                                    onGenerate: generateTodayTasks,
+                                    onGenerate: {
+                                        showGenerateTodayTasksConfirmation = true
+                                    },
                                     onSave: saveTodayTasks
                                 )
                             } else {
@@ -41,9 +49,18 @@ struct TaskManagementView: View {
                                 if !actionPlan.milestones.isEmpty {
                                     EditableMilestonesSection(milestones: actionPlan.milestones)
                                 }
+                                
+                                // Regenerate Action Plan Button
+                                RegenerateActionPlanButton(
+                                    onRegenerate: {
+                                        showRegenerateConfirmation = true
+                                    }
+                                )
                             }
                         }
                         .padding(.vertical)
+                        .frame(maxWidth: ResponsiveLayout.maxContentWidth())
+                        .padding(.horizontal, ResponsiveLayout.horizontalPadding())
                     }
                 } else {
                     ScrollView {
@@ -52,7 +69,7 @@ struct TaskManagementView: View {
                             VStack(spacing: BrandSpacing.md) {
                                 Image(systemName: "checklist")
                                     .font(.system(size: 60))
-                                    .foregroundColor(.gray)
+                                    .foregroundColor(BrandColors.secondaryText)
                                 Text("尚未生成行動計劃")
                                     .font(BrandTypography.headline)
                                     .foregroundColor(BrandColors.primaryText)
@@ -80,12 +97,12 @@ struct TaskManagementView: View {
                                                     Text(isGeneratingActionPlan ? "正在生成..." : "生成行動計劃")
                                                 }
                                                 .font(BrandTypography.headline)
-                                                .foregroundColor(.white)
+                                                .fontWeight(.bold)
+                                                .foregroundColor(BrandColors.invertedText) // Black text on white button
                                                 .frame(maxWidth: .infinity)
-                                                .padding(.vertical, BrandSpacing.lg)
-                                                .background(BrandColors.primaryGradient)
-                                                .cornerRadius(BrandRadius.medium)
-                                                .shadow(color: BrandColors.primaryBlue.opacity(0.3), radius: 8, x: 0, y: 4)
+                                                .frame(height: 50)
+                                                .background(BrandColors.primaryText) // White background
+                                                .clipShape(Capsule()) // Pill shape
                                             }
                                             .buttonStyle(.plain)
                                             .disabled(isGeneratingActionPlan)
@@ -103,10 +120,12 @@ struct TaskManagementView: View {
                                                             Text("編輯生命藍圖")
                                                         }
                                                         .font(BrandTypography.headline)
-                                                        .foregroundColor(.white)
+                                                        .fontWeight(.bold)
+                                                        .foregroundColor(BrandColors.invertedText) // Black text on white button
                                                         .frame(maxWidth: .infinity)
-                                                        .padding(.vertical, BrandSpacing.md)
-                                                        .background(BrandColors.primaryGradient)
+                                                        .frame(height: 50)
+                                                        .background(BrandColors.primaryText) // White background
+                                                        .clipShape(Capsule()) // Pill shape
                                                         .cornerRadius(BrandRadius.medium)
                                                     }
                                                     .buttonStyle(.plain)
@@ -124,14 +143,16 @@ struct TaskManagementView: View {
                                         NavigationLink(destination: DeepeningExplorationView()) {
                                             HStack(spacing: BrandSpacing.sm) {
                                                 Image(systemName: "chart.line.uptrend.xyaxis")
+                                                    .font(.system(size: 16, weight: .bold))
                                                 Text("前往深化探索")
+                                                    .font(BrandTypography.headline)
+                                                    .fontWeight(.bold)
                                             }
-                                            .font(BrandTypography.headline)
-                                            .foregroundColor(.white)
+                                            .foregroundColor(BrandColors.invertedText) // Black text on white button
                                             .frame(maxWidth: .infinity)
-                                            .padding(.vertical, BrandSpacing.md)
-                                            .background(BrandColors.primaryGradient)
-                                            .cornerRadius(BrandRadius.medium)
+                                            .frame(height: 50)
+                                            .background(BrandColors.primaryText) // White background
+                                            .clipShape(Capsule()) // Pill shape
                                         }
                                         .buttonStyle(.plain)
                                     }
@@ -144,7 +165,9 @@ struct TaskManagementView: View {
                     }
                 }
             }
+            .background(BrandColors.background)
             .navigationTitle("任務管理")
+            .preferredColorScheme(themeManager.isDarkMode ? .dark : .light)
             .alert("需要選擇最愛方向", isPresented: $showFavoriteRequiredAlert) {
                 Button("確定", role: .cancel) { }
             } message: {
@@ -155,7 +178,37 @@ struct TaskManagementView: View {
             } message: {
                 Text("行動計劃已生成")
             }
+            .alert("重新生成行動計劃", isPresented: $showRegenerateConfirmation) {
+                Button("取消", role: .cancel) { }
+                Button("確認重新生成", role: .destructive) {
+                    regenerateActionPlan()
+                }
+            } message: {
+                Text("重新生成行動計劃將會刪除現有的行動計劃。此操作無法復原，確定要繼續嗎？")
+            }
+            .alert("生成今日任務", isPresented: $showGenerateTodayTasksConfirmation) {
+                Button("取消", role: .cancel) { }
+                Button("確認生成", role: .destructive) {
+                    generateTodayTasks()
+                }
+            } message: {
+                Text("生成新的今日任務將會重置所有現有的今日任務。此操作無法復原，確定要繼續嗎？")
+            }
+            .alert("任務標題不能為空", isPresented: $showEmptyTitleAlert) {
+                Button("確定", role: .cancel) { }
+            } message: {
+                Text("請為所有任務輸入標題後再儲存。")
+            }
         }
+    }
+    
+    private func regenerateActionPlan() {
+        // IMPORTANT: Clear existing action plan first
+        DataService.shared.updateUserProfile { profile in
+            profile.actionPlan = nil
+        }
+        // Then generate new one
+        generateActionPlan()
     }
     
     private func generateTodayTasks() {
@@ -187,6 +240,14 @@ struct TaskManagementView: View {
     }
     
     private func saveTodayTasks() {
+        // Check if any task has empty title
+        let hasEmptyTitle = editedTodayTasks.contains { $0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        
+        if hasEmptyTitle {
+            showEmptyTitleAlert = true
+            return
+        }
+        
         DataService.shared.updateUserProfile { profile in
             if var actionPlan = profile.actionPlan {
                 actionPlan.todayTasks = editedTodayTasks
@@ -235,6 +296,30 @@ struct TaskManagementView: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Regenerate Action Plan Button
+struct RegenerateActionPlanButton: View {
+    let onRegenerate: () -> Void
+    
+    var body: some View {
+        Button(action: onRegenerate) {
+            HStack(spacing: BrandSpacing.sm) {
+                Image(systemName: "arrow.clockwise")
+                Text("重新生成行動計劃")
+            }
+            .font(BrandTypography.headline)
+            .fontWeight(.bold)
+            .foregroundColor(BrandColors.invertedText)
+            .frame(maxWidth: .infinity)
+            .frame(height: 50)
+            .background(BrandColors.actionAccent)
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, BrandSpacing.xl)
+        .padding(.top, BrandSpacing.lg)
     }
 }
 
@@ -479,34 +564,45 @@ struct MilestoneCard: View {
             }
             
             Text(milestone.description)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+                .font(BrandTypography.subheadline)
+                .foregroundColor(BrandColors.secondaryText)
             
             if let targetDate = milestone.targetDate {
                 Text("目標日期：\(targetDate.formatted(date: .abbreviated, time: .omitted))")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(BrandTypography.caption)
+                    .foregroundColor(BrandColors.secondaryText)
             }
             
             if !milestone.successIndicators.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("成功指標：")
-                        .font(.caption)
+                        .font(BrandTypography.caption)
                         .fontWeight(.semibold)
+                        .foregroundColor(BrandColors.primaryText)
                     ForEach(milestone.successIndicators, id: \.self) { indicator in
                         HStack(spacing: 4) {
                             Text("•")
                             Text(indicator)
-                                .font(.caption)
+                                .font(BrandTypography.caption)
                         }
-                        .foregroundColor(.secondary)
+                        .foregroundColor(BrandColors.secondaryText)
                     }
                 }
             }
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(BrandColors.surface)
         .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(BrandColors.borderColor, lineWidth: 1)
+        )
+        .shadow(
+            color: BrandColors.cardShadow.color,
+            radius: BrandColors.cardShadow.radius,
+            x: BrandColors.cardShadow.x,
+            y: BrandColors.cardShadow.y
+        )
     }
     
     private func toggleMilestoneCompletion(_ milestone: Milestone) {

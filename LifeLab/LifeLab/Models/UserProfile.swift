@@ -38,7 +38,7 @@ struct UserProfile: Codable, Identifiable {
     }
 }
 
-struct StrengthResponse: Codable, Identifiable {
+struct StrengthResponse: Codable, Identifiable, Equatable {
     let id: UUID
     let questionId: Int
     let question: String
@@ -54,7 +54,7 @@ struct StrengthResponse: Codable, Identifiable {
     }
 }
 
-struct ValueRanking: Codable, Identifiable {
+struct ValueRanking: Codable, Identifiable, Equatable {
     let id: UUID
     let value: CoreValue
     var rank: Int // 1-10, 0 means not selected, -1 means greyed out (unimportant)
@@ -177,7 +177,7 @@ struct FeasibilityAssessment: Codable {
     var path6: String?
 }
 
-struct LifeBlueprint: Codable {
+struct LifeBlueprint: Codable, Equatable {
     var vocationDirections: [VocationDirection]
     var strengthsSummary: String
     var feasibilityAssessment: String
@@ -193,7 +193,7 @@ struct LifeBlueprint: Codable {
     }
 }
 
-struct VocationDirection: Codable, Identifiable {
+struct VocationDirection: Codable, Identifiable, Equatable {
     let id: UUID
     var title: String
     var description: String
