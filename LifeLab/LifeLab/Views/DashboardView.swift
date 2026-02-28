@@ -164,34 +164,19 @@ struct DashboardView: View {
                             progress: calculateInitialScanProgress()
                         )
                         
-                        NavigationLink(destination: DeepeningExplorationView()) {
-                            ProgressCard(
-                                title: "深化探索",
-                                isCompleted: isDeepeningExplorationComplete(),
-                                progress: calculateDeepeningProgress()
-                            )
-                        }
-                        .buttonStyle(.plain)
+                        // Disabled navigation - just show progress card without link
+                        ProgressCard(
+                            title: "深化探索",
+                            isCompleted: isDeepeningExplorationComplete(),
+                            progress: calculateDeepeningProgress()
+                        )
                         
-                        if dataService.userProfile?.actionPlan != nil {
-                            NavigationLink(destination: TaskManagementView()) {
-                                ProgressCard(
-                                    title: "行動計劃",
-                                    isCompleted: true,
-                                    progress: 1.0
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        } else {
-                            NavigationLink(destination: TaskManagementView()) {
-                                ProgressCard(
-                                    title: "行動計劃",
-                                    isCompleted: false,
-                                    progress: 0.0
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
+                        // Disabled navigation - just show progress card without link
+                        ProgressCard(
+                            title: "行動計劃",
+                            isCompleted: dataService.userProfile?.actionPlan != nil,
+                            progress: dataService.userProfile?.actionPlan != nil ? 1.0 : 0.0
+                        )
                     }
                     .padding(BrandSpacing.lg)
                     .background(BrandColors.surface)
@@ -219,6 +204,8 @@ struct ProgressCard: View {
     let title: String
     let isCompleted: Bool
     let progress: Double
+    // CRITICAL: Observe theme changes to ensure proper updates
+    @StateObject private var themeManager = ThemeManager.shared
     
     init(title: String, isCompleted: Bool, progress: Double = 0.0) {
         self.title = title
@@ -231,7 +218,7 @@ struct ProgressCard: View {
             HStack {
                 Text(title)
                     .font(BrandTypography.headline)
-                    .foregroundColor(BrandColors.primaryText)
+                    .foregroundColor(BrandColors.primaryText) // Theme-aware: white in dark mode, dark charcoal in light mode
                 Spacer()
                 Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
                     .foregroundColor(isCompleted ? BrandColors.brandAccent : BrandColors.tertiaryText) // Golden yellow when completed
@@ -242,7 +229,7 @@ struct ProgressCard: View {
                 GeometryReader { geometry in
                     ZStack(alignment: .leading) {
                         RoundedRectangle(cornerRadius: BrandRadius.small)
-                            .fill(BrandColors.surface) // Track: Dark charcoal
+                            .fill(BrandColors.surface) // Theme-aware: dark charcoal in dark mode, white in light mode
                             .frame(height: 8)
                         
                         RoundedRectangle(cornerRadius: BrandRadius.small)
@@ -254,11 +241,11 @@ struct ProgressCard: View {
                 
                 Text("\(Int(progress * 100))% 完成")
                     .font(BrandTypography.caption)
-                    .foregroundColor(BrandColors.secondaryText)
+                    .foregroundColor(BrandColors.secondaryText) // Theme-aware: light gray in dark mode, soft gray in light mode
             }
         }
         .padding(BrandSpacing.lg)
-        .background(BrandColors.surface) // #1C1C1E
+        .background(BrandColors.surface) // Theme-aware: dark charcoal (#1C1C1E) in dark mode, white in light mode
         .cornerRadius(BrandRadius.medium)
     }
 }

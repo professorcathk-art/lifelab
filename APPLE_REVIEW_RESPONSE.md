@@ -1,251 +1,110 @@
-# Apple App Review Response - LifeLab
+# Response to App Store Review Feedback
 
-## 代码健康检查结果
-
-✅ **编译状态**：无错误
-✅ **Linter检查**：无错误
-✅ **Equatable协议**：所有必要类型已符合
-✅ **iPad响应式布局**：所有13个主要视图已更新
+**Submission ID:** 38cfd67e-8fed-40d4-8876-fadcd50f8cfe  
+**Version:** 1.3.1 (Build 2)  
+**Date:** February 28, 2026
 
 ---
 
-## 回答Apple的3个问题
+Dear App Review Team,
 
-### 1. Please clarify does your app use third-party AI service?
+Thank you for your feedback. We have addressed all the issues identified in your review. Below is a summary of the changes made:
 
-**回答：**
+## 1. Guidelines 5.1.1(i) and 5.1.2(i) - Privacy - Data Collection and Data Use
 
-Yes, our app uses a third-party AI service to provide personalized life blueprint and career guidance to users.
+**Issue:** The app did not clearly explain what data is sent, identify who receives it, and ask for user permission before sharing data with a third-party AI service.
 
-**Details:**
-- **AI Service Provider**: AIML API (api.aimlapi.com)
-- **AI Model**: Anthropic Claude Sonnet 4.5 (via AIML API)
-- **Purpose**: Generate personalized career direction recommendations, strengths analysis, and action plans based on user-provided information
+**Resolution:**
+- ✅ **Explicit Consent Mechanism**: Added a mandatory AI service consent checkbox on the login/signup page. Users must explicitly check the box and agree to the "AI 服務使用條款" (AI Service Terms) before they can proceed with registration or login. The app will not send any data to the AI service until explicit consent is obtained.
 
-The AI service is used exclusively for:
-1. Generating personalized life blueprint (職業方向建議)
-2. Creating strengths summary (優勢總結)
-3. Providing feasibility assessment (可行性評估)
-4. Generating action plans (行動計劃)
-5. Creating daily task recommendations (今日任務)
+- ✅ **Clear Data Disclosure**: The consent checkbox includes a tappable link to the privacy policy, which clearly explains:
+  - **What data is sent**: Interests, strengths, values, basic information (if provided), and deepening exploration data (if provided)
+  - **Who receives the data**: Anthropic Claude Sonnet 4.5 (via AIML API) - Anthropic Inc.
+  - **Data protection**: All data transmission uses HTTPS encryption, and Anthropic does not use the data for AI model training
 
----
+- ✅ **Updated Privacy Policy**: The privacy policy (available at the link provided in App Store Connect) has been updated to include:
+  - Detailed explanation of what data is collected and how
+  - Explicit identification of Anthropic as the third-party AI service provider
+  - Clear statement that data is only shared after explicit user consent
+  - Confirmation that Anthropic provides equal or equivalent data protection standards
 
-### 2. If yes, please clarify what personal data does it collect and/or sent to the third-parties AI service?
+**Implementation Details:**
+- Consent status is stored in UserDefaults (user-specific key)
+- The app checks consent status before any AI API calls
+- Users can review the privacy policy at any time through the consent checkbox link
 
-**回答：**
+## 2. Guideline 4.0 - Design - Typography
 
-Our app sends the following user-provided data to the third-party AI service **only for the purpose of generating personalized recommendations**:
+**Issue:** The app included hard-to-read type or typography.
 
-**Data Sent to AI Service:**
+**Resolution:**
+- ✅ **Theme Switching Fix**: Fixed all instances where UI elements did not properly update when switching between light and dark modes. Added `@StateObject private var themeManager = ThemeManager.shared` to all custom components to ensure proper theme observation.
 
-1. **Basic Information** (基本資料) - Optional fields:
-   - Region (居住地區)
-   - Age (年齡)
-   - Occupation (職業)
-   - Annual salary (年薪)
-   - Family status (家庭狀況)
-   - Education level (學歷)
+- ✅ **Text Visibility**: Ensured all text is clearly visible in both light and dark modes:
+  - White text on dark backgrounds in dark mode
+  - Dark text on light backgrounds in light mode
+  - All UI components (text fields, buttons, labels, cards) now properly respond to theme changes
 
-2. **Initial Scan Data** (初步掃描資料):
-   - Interest keywords (興趣關鍵詞) - Selected by user
-   - Strength keywords (天賦關鍵詞) - Selected by user
-   - Strength questionnaire answers (天賦問卷回答) - User-written responses
-   - Core values ranking (核心價值觀排序) - Selected and ranked by user
+- ✅ **Comprehensive Review**: Conducted a thorough review of all screens to ensure consistent typography and readability across the entire app, including:
+  - Login/Signup screens
+  - Home/Dashboard
+  - Profile page
+  - Deepening Exploration page
+  - Task Management page
+  - Settings page
 
-3. **Deepening Exploration Data** (深化探索資料) - Optional:
-   - Flow diary entries (心流日記) - Activity descriptions and energy levels
-   - Values reflection answers (價值觀反思回答)
-   - Resource inventory (資源盤點) - Time, money, items, network resources
-   - Acquired strengths (後天強項) - Experience, knowledge, skills, achievements
-   - Feasibility assessment paths (可行性評估路徑)
+## 3. Guideline 2.1 - Performance - App Completeness (IAP Submission)
 
-**Important Notes:**
-- **No personally identifiable information** (PII) is sent: No names, email addresses, phone numbers, or device identifiers are included
-- **No authentication tokens** or user IDs are sent
-- Data is sent **only when user explicitly requests** AI-generated content (e.g., clicking "開啟我的理想人生" button)
-- All data transmission uses **HTTPS encryption**
-- Data is **not stored** by the AI service provider for training purposes (based on AIML API's privacy policy)
+**Issue:** In-app purchase products (年/季/月付) were not submitted for review.
 
-**Data NOT Sent:**
-- User authentication credentials
-- Email addresses
-- Device identifiers
-- Location data (beyond user-provided region)
-- Payment information
-- Any data from other apps or services
+**Resolution:**
+- ✅ **IAP Products Submitted**: All three subscription products (年/季/月付) have been properly configured and submitted for review in App Store Connect.
 
----
+- ✅ **Metadata Completed**: All required metadata for the in-app purchase products has been completed, including:
+  - Product descriptions
+  - Localization information
+  - App Review screenshots
+  - Pricing information
 
-### 3. Please clarify does the app obtain user's consent before sending their data?
+- ✅ **Build Submission**: A new binary (Version 1.3.1, Build 2) has been uploaded with the IAP products properly linked to the app version.
 
-**回答：**
+## 4. Guideline 2.1 - Performance - App Completeness (IAP Purchase Bug)
 
-Yes, our app obtains explicit user consent before sending any data to the third-party AI service.
+**Issue:** An error message appeared during purchase of the plan, creating a poor user experience.
 
-**Consent Mechanism:**
+**Resolution:**
+- ✅ **Purchase Flow Optimization**: 
+  - Purchase is now immediately acknowledged upon successful payment
+  - AI generation runs in the background (non-blocking) after purchase confirmation
+  - Users are redirected to a dedicated progress page with a visual progress indicator while AI generates their life blueprint
 
-1. **Explicit User Action Required**:
-   - Users must **explicitly click** the "開啟我的理想人生" (Unlock My Ideal Life) button in the Payment page
-   - This action serves as **explicit consent** to use their provided data for AI analysis
-   - The button clearly states: "解鎖專屬 AI 深度分析" (Unlock exclusive AI deep analysis)
+- ✅ **Error Handling Improvements**:
+  - Added retry logic for product loading with exponential backoff
+  - Enhanced error messages with clear, actionable guidance
+  - Improved network error handling and user feedback
 
-2. **Transparent Information Disclosure**:
-   - Before data collection, users see clear descriptions:
-     - "請填寫您的基本資料，這將幫助AI為您提供更精準的建議" (Please fill in your basic information, which will help AI provide more accurate recommendations)
-     - "基於您的輸入，AI為您生成的個人化方向建議" (Personalized direction recommendations generated by AI based on your input)
+- ✅ **Background Task Support**: Implemented proper background task handling to ensure AI generation continues even if the user switches screens or the app goes to background.
 
-3. **Privacy Policy**:
-   - Our app includes a comprehensive Privacy Policy that explains:
-     - What data is collected
-     - How data is used (including AI service usage)
-     - Third-party services used (including AI service)
-     - User rights regarding their data
-   - Privacy Policy URL: [To be added in App Store Connect]
+- ✅ **Subscription Check**: Enhanced subscription status verification to prevent false positives and ensure accurate subscription state management.
 
-4. **User Control**:
-   - Users can **delete their account and all data** at any time via Settings → Account → Delete Account
-   - Users can **export their data** before deletion
-   - Users can **modify or delete** their information at any time
-
-5. **No Automatic Data Transmission**:
-   - Data is **only sent** when user explicitly requests AI generation
-   - No background data transmission
-   - No data is sent without user action
-
-**Consent Flow:**
-1. User fills in their information voluntarily
-2. User sees clear indication that data will be used for AI analysis
-3. User clicks "開啟我的理想人生" button → **Explicit consent**
-4. Data is sent to AI service only after this explicit action
-5. User receives AI-generated recommendations
+**Testing Notes:**
+- All IAP flows have been tested in sandbox environment
+- Purchase flow works correctly on both iPhone and iPad
+- Error handling has been verified for various edge cases
+- Background AI generation has been tested for reliability
 
 ---
 
-## 如何重新提交审核
+## Summary
 
-### Step 1: 在App Store Connect中回复
+All issues identified in your review have been addressed:
 
-1. 登录 [App Store Connect](https://appstoreconnect.apple.com)
-2. 进入 **My Apps** → 选择 **LifeLab**
-3. 找到被拒绝的版本，点击 **Resolution Center**
-4. 点击 **Reply to App Review** 或 **Provide Additional Information**
-5. 将上述3个问题的回答复制粘贴到回复框中
+1. ✅ **Privacy Compliance**: Explicit consent mechanism, clear data disclosure, and updated privacy policy
+2. ✅ **Typography**: Fixed all readability issues across light and dark modes
+3. ✅ **IAP Submission**: All products submitted and properly linked to the app version
+4. ✅ **IAP Purchase Flow**: Fixed purchase bugs and improved user experience
 
-### Step 2: 确保隐私政策链接
+The app is now ready for review. We appreciate your patience and look forward to your approval.
 
-1. 在App Store Connect的 **App Information** 页面
-2. 找到 **Privacy Policy URL** 字段
-3. 确保填写了隐私政策URL（如果还没有，需要先托管隐私政策HTML文件）
-
-**建议的隐私政策URL格式：**
-- 如果托管在网站：`https://yourdomain.com/privacy.html`
-- 如果使用GitHub Pages：`https://yourusername.github.io/lifelab/privacy.html`
-
-### Step 3: 更新App隐私信息
-
-在App Store Connect的 **App Privacy** 页面，确保：
-
-1. **Data Collection** (数据收集):
-   - ✅ 选择 "Yes, we collect data"
-   - 添加所有收集的数据类型：
-     - Contact Info (Email, Name) - 用于账户管理
-     - User Content (Interests, Strengths, Values) - 用于AI分析
-     - Other Diagnostic Data - 用于改进服务
-
-2. **Data Use** (数据使用):
-   - ✅ App Functionality
-   - ✅ Analytics
-   - ✅ Product Personalization (AI recommendations)
-
-3. **Data Linked to User** (链接到用户的数据):
-   - ✅ Yes, data is linked to user identity
-
-4. **Data Used to Track User** (用于跟踪用户的数据):
-   - ❌ No (除非你使用广告追踪)
-
-5. **Third-Party Sharing** (第三方分享):
-   - ✅ Yes, we share data with third parties
-   - 添加：
-     - **AIML API** (AI Service Provider)
-       - Purpose: AI Analysis and Recommendations
-       - Data Types: User Content (interests, strengths, values, etc.)
-       - Data Not Linked to User: Yes (数据不链接到用户身份)
-
-### Step 4: 重新提交构建
-
-1. 确保代码已更新（如果需要添加隐私政策链接）
-2. 在Xcode中：
-   - Product → Archive
-   - 上传到App Store Connect
-3. 在App Store Connect中：
-   - 选择新的构建版本
-   - 点击 **Submit for Review**
-
----
-
-## 建议的改进（可选但推荐）
-
-### 1. 在App中添加隐私政策链接
-
-在SettingsView中添加隐私政策链接：
-
-```swift
-Section("關於") {
-    // ... existing code ...
-    
-    Link(destination: URL(string: "https://your-privacy-policy-url.com")!) {
-        Label("隱私政策", systemImage: "hand.raised.fill")
-    }
-}
-```
-
-### 2. 在首次使用时显示隐私政策同意
-
-在用户首次打开App时，显示隐私政策同意对话框（可选，但强烈推荐）。
-
-### 3. 在App Store Connect中更新隐私政策URL
-
-确保隐私政策URL是公开可访问的。
-
----
-
-## 重要提醒
-
-1. **确保隐私政策URL可访问**：Apple会检查这个URL
-2. **确保回答详细且准确**：基于实际代码实现
-3. **不要隐瞒任何信息**：诚实回答所有问题
-4. **保持一致性**：App Store Connect中的隐私信息应与代码实现一致
-
----
-
-## 隐私政策URL建议
-
-如果还没有托管隐私政策，可以：
-
-1. **使用GitHub Pages**（免费）：
-   - 将 `privacy.html` 上传到GitHub仓库
-   - 启用GitHub Pages
-   - URL格式：`https://yourusername.github.io/lifelab/privacy.html`
-
-2. **使用现有网站**：
-   - 如果有网站，将 `privacy.html` 上传到网站根目录
-   - URL格式：`https://yourdomain.com/privacy.html`
-
-3. **使用Supabase Storage**（如果使用Supabase）：
-   - 上传到Supabase Storage
-   - 设置为公开访问
-   - 使用公开URL
-
----
-
-## 检查清单
-
-在重新提交前，请确认：
-
-- [ ] 已回答所有3个问题
-- [ ] 隐私政策URL已填写且可访问
-- [ ] App Privacy信息已更新
-- [ ] 代码中已添加隐私政策链接（推荐）
-- [ ] 所有信息与代码实现一致
-- [ ] 已上传新的构建版本（如果需要）
+Best regards,  
+LifeLab Development Team

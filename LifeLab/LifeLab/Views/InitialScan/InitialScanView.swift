@@ -17,13 +17,24 @@ struct InitialScanView: View {
                     StrengthsQuestionnaireView()
                 case .values:
                     ValuesRankingView()
+                case .aiConsent:
+                    AIConsentView()
                 case .aiSummary:
                     AISummaryView()
                 case .loading:
-                    // Show loading animation BEFORE payment (just animation, no AI)
-                    PlanGenerationLoadingView {
-                        // After animation completes, show payment page
-                        viewModel.currentStep = .payment
+                    // Show progress page while AI generates blueprint
+                    if viewModel.isLoadingBlueprint {
+                        // AI is generating - show progress page
+                        BlueprintGenerationProgressView()
+                    } else if viewModel.hasPaid {
+                        // User has paid, waiting for blueprint - show progress page
+                        BlueprintGenerationProgressView()
+                    } else {
+                        // Loading animation BEFORE payment (just animation, no AI)
+                        PlanGenerationLoadingView {
+                            // After animation completes, show payment page
+                            viewModel.currentStep = .payment
+                        }
                     }
                 case .payment:
                     PaymentView()
@@ -48,7 +59,7 @@ struct ProgressIndicator: View {
         // NO background box - dots directly on pure black background
         // DISABLED: Users cannot tap to jump between steps - must complete in order
         HStack(spacing: BrandSpacing.sm) {
-            ForEach(1...8, id: \.self) { index in
+            ForEach(1...9, id: \.self) { index in
                 ZStack {
                     // Outer circle - Purple for current/completed, dark gray for future
                     Circle()

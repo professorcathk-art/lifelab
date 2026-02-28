@@ -19,6 +19,10 @@ class InitialScanViewModel: ObservableObject {
     @Published var hasPaid = false
     @Published var lifeBlueprint: LifeBlueprint?
     @Published var isLoadingBlueprint = false
+    @Published var hasGivenAIConsent = false  // Track user consent for AI data sharing
+    
+    // Store background task ID for blueprint generation
+    private var blueprintBackgroundTaskID: UIBackgroundTaskIdentifier = .invalid
     
     private let interestDictionary = InterestDictionary.shared
     private let strengthsQuestions = StrengthsQuestions.shared
@@ -26,6 +30,27 @@ class InitialScanViewModel: ObservableObject {
     
     init() {
         loadInitialKeywords()
+        // Load AI consent status from UserDefaults (user-specific)
+        loadAIConsentStatus()
+    }
+    
+    func loadAIConsentStatus() {
+        if let userId = AuthService.shared.currentUser?.id {
+            let consentKey = "lifelab_ai_consent_\(userId)"
+            hasGivenAIConsent = UserDefaults.standard.bool(forKey: consentKey)
+            print("📋 Loaded AI consent status for user \(userId): \(hasGivenAIConsent)")
+        } else {
+            hasGivenAIConsent = false
+            print("📋 No user ID, consent status: false")
+        }
+    }
+    
+    func saveAIConsentStatus() {
+        if let userId = AuthService.shared.currentUser?.id {
+            let consentKey = "lifelab_ai_consent_\(userId)"
+            UserDefaults.standard.set(true, forKey: consentKey)
+            hasGivenAIConsent = true
+        }
     }
     
     func loadInitialKeywords() {
@@ -109,6 +134,22 @@ class InitialScanViewModel: ObservableObject {
             initializeValues()
             currentStep = .values
         case .values:
+            // Check if user has already given consent (from login page)
+            if hasGivenAIConsent {
+                // User already consented during login, proceed directly to AI summary
+                currentStep = .aiSummary
+                generateAISummary()
+            } else {
+                // User hasn't consented yet (shouldn't happen if login flow is correct, but fallback)
+                // Move to AI consent screen before sending data to AI
+                currentStep = .aiConsent
+            }
+        case .aiConsent:
+            // Only proceed to AI summary if consent has been given
+            guard hasGivenAIConsent else {
+                print("⚠️ User has not given AI consent yet")
+                return
+            }
             currentStep = .aiSummary
             generateAISummary()
         case .aiSummary:
@@ -192,8 +233,10 @@ class InitialScanViewModel: ObservableObject {
             currentStep = .interests
         case .values:
             currentStep = .strengths
-        case .aiSummary:
+        case .aiConsent:
             currentStep = .values
+        case .aiSummary:
+            currentStep = .aiConsent
         case .loading:
             currentStep = .aiSummary
         case .payment:
@@ -336,6 +379,13 @@ class InitialScanViewModel: ObservableObject {
     }
     
     func generateAISummary() {
+        // CRITICAL: Ensure user has given consent before sending data to AI
+        guard hasGivenAIConsent else {
+            print("❌ Cannot generate AI summary: User has not given consent")
+            isLoadingSummary = false
+            return
+        }
+        
         isLoadingSummary = true
         Task {
             do {
@@ -412,31 +462,91 @@ class InitialScanViewModel: ObservableObject {
     
     func completePayment() {
         hasPaid = true
-        // Start loading blueprint generation AFTER payment
+        // Navigate to loading page immediately
+        currentStep = .loading
+        // Start blueprint generation in background (non-blocking)
         generateLifeBlueprint()
     }
     
     func generateLifeBlueprint() {
+        // CRITICAL: Ensure user has given consent before sending data to AI
+        guard hasGivenAIConsent else {
+            print("❌ Cannot generate life blueprint: User has not given consent")
+            isLoadingBlueprint = false
+            return
+        }
+        
         isLoadingBlueprint = true
-        Task {
+        
+        // CRITICAL: Request background execution time to continue task even when app is minimized
+        // This allows the task to continue for up to ~30 seconds after app goes to background
+        // Store background task ID in class property so it can be accessed in closures
+        blueprintBackgroundTaskID = UIApplication.shared.beginBackgroundTask(withName: "GenerateLifeBlueprint") { [weak self] in
+            // Task expired - end background task
+            print("⚠️ Background task expired - ending task")
+            guard let self = self else { return }
+            if self.blueprintBackgroundTaskID != .invalid {
+                UIApplication.shared.endBackgroundTask(self.blueprintBackgroundTaskID)
+                self.blueprintBackgroundTaskID = .invalid
+            }
+        }
+        
+        // Capture current values before starting background task
+        let currentBasicInfo = basicInfo
+        let currentInterests = selectedInterests
+        let currentStrengths = strengths
+        let currentValues = selectedValues
+        
+        // Capture background task ID for use in Task closure
+        let capturedTaskID = blueprintBackgroundTaskID
+        
+        print("🔄 Starting blueprint generation (will continue in background if app is minimized)")
+        print("   Background task ID: \(capturedTaskID.rawValue)")
+        
+        // Use Task to ensure task continues even if app goes to background
+        // beginBackgroundTask provides up to ~30 seconds of background execution time
+        Task { [weak self] in
+            guard let self = self else {
+                // End background task if view model is deallocated
+                if capturedTaskID != .invalid {
+                    await MainActor.run {
+                        UIApplication.shared.endBackgroundTask(capturedTaskID)
+                    }
+                }
+                return
+            }
+            
+            // Helper function to end background task
+            let endBackgroundTask = {
+                if self.blueprintBackgroundTaskID != .invalid {
+                    UIApplication.shared.endBackgroundTask(self.blueprintBackgroundTaskID)
+                    self.blueprintBackgroundTaskID = .invalid
+                    print("✅ Background task ended successfully")
+                }
+            }
+            
             do {
                 // Use complete user profile from DataService to include ALL data (including deepening exploration data)
-                var profile: UserProfile
-                if let existingProfile = DataService.shared.userProfile {
-                    // Use existing profile with ALL data
-                    profile = existingProfile
-                    // Update with current form data
-                    profile.basicInfo = basicInfo
-                    profile.interests = selectedInterests
-                    profile.strengths = strengths
-                    profile.values = selectedValues.filter { $0.rank > 0 && !$0.isGreyedOut }
-                } else {
-                    // Fallback: create new profile with current data
-                    profile = UserProfile()
-                    profile.basicInfo = basicInfo
-                    profile.interests = selectedInterests
-                    profile.strengths = strengths
-                    profile.values = selectedValues.filter { $0.rank > 0 && !$0.isGreyedOut }
+                // Initialize profile first, then update it
+                let profile: UserProfile = await MainActor.run {
+                    if let existingProfile = DataService.shared.userProfile {
+                        // Use existing profile with ALL data
+                        var updatedProfile = existingProfile
+                        // Update with current form data (captured before task started)
+                        updatedProfile.basicInfo = currentBasicInfo
+                        updatedProfile.interests = currentInterests
+                        updatedProfile.strengths = currentStrengths
+                        updatedProfile.values = currentValues.filter { $0.rank > 0 && !$0.isGreyedOut }
+                        return updatedProfile
+                    } else {
+                        // Fallback: create new profile with current data
+                        var newProfile = UserProfile()
+                        newProfile.basicInfo = currentBasicInfo
+                        newProfile.interests = currentInterests
+                        newProfile.strengths = currentStrengths
+                        newProfile.values = currentValues.filter { $0.rank > 0 && !$0.isGreyedOut }
+                        return newProfile
+                    }
                 }
                 
                 // Add timeout to prevent infinite loading
@@ -454,6 +564,8 @@ class InitialScanViewModel: ObservableObject {
                     group.cancelAll()
                     return result
                 }
+                
+                print("✅ Blueprint generation completed (even if app was in background)")
                 
                 await MainActor.run {
                     var updatedBlueprint = blueprint
@@ -497,7 +609,15 @@ class InitialScanViewModel: ObservableObject {
                     // because userProfile is @Published and SwiftUI will automatically re-evaluate
                     // The view will switch from InitialScanView to MainTabView immediately
                     self.isLoadingBlueprint = false
+                    
+                    // CRITICAL: Do NOT set currentStep to .blueprint here
+                    // ContentView will automatically detect the blueprint and switch to MainTabView
+                    // Setting currentStep here would keep user on the blueprint preview page
                     print("✅ Blueprint saved to DataService, ContentView will immediately switch to MainTabView")
+                    print("   NOT setting currentStep - ContentView will handle navigation automatically")
+                    
+                    // End background task now that we're done
+                    endBackgroundTask()
                 }
             } catch {
                 print("❌❌❌ CRITICAL ERROR: Life blueprint generation failed!")
@@ -512,6 +632,9 @@ class InitialScanViewModel: ObservableObject {
                     // Instead, retry API call or show error message
                     print("❌❌❌ NOT using fallback - API call failed!")
                     print("❌❌❌ Please check Xcode console for API call logs")
+                    
+                    // End background task even on error
+                    endBackgroundTask()
                 }
                 
                 // Retry API call once - use complete profile

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct BasicInfoView: View {
     @EnvironmentObject var viewModel: InitialScanViewModel
+    @StateObject private var themeManager = ThemeManager.shared
     @State private var selectedRegion: String = ""
     @State private var ageText: String = ""
     @State private var nameText: String = ""
@@ -158,10 +159,20 @@ struct BasicInfoView: View {
                             Image(systemName: "arrow.right")
                                 .font(.system(size: 16, weight: .bold))
                         }
-                        .foregroundColor(BrandColors.invertedText) // Black text
+                        .foregroundColor(
+                            // CRITICAL: Ensure proper contrast
+                            // Dark mode: White background → Black text
+                            // Light mode: Dark charcoal background → White text
+                            themeManager.isDarkMode ? Color.black : Color.white
+                        )
                         .frame(maxWidth: .infinity)
                         .frame(height: 50) // Fixed height
-                        .background(BrandColors.primaryText) // White background
+                        .background(
+                            // CRITICAL: Ensure proper contrast
+                            // Dark mode: White background
+                            // Light mode: Dark charcoal background
+                            themeManager.isDarkMode ? Color.white : BrandColors.primaryText
+                        )
                         .clipShape(Capsule()) // Pill shape
                     }
                     .buttonStyle(.plain)
@@ -175,7 +186,7 @@ struct BasicInfoView: View {
                 }
             }
         }
-        .preferredColorScheme(ThemeManager.shared.isDarkMode ? .dark : .light)
+        .preferredColorScheme(themeManager.isDarkMode ? .dark : .light)
         .onAppear {
             // Load existing data from viewModel when view appears (for review mode)
             if let region = viewModel.basicInfo.region, !region.isEmpty {
@@ -249,6 +260,9 @@ struct ModernFormField<Content: View, Footer: View>: View {
     @ViewBuilder let content: () -> Content
     @ViewBuilder let footer: () -> Footer
     
+    // CRITICAL: Observe theme changes to ensure proper updates
+    @StateObject private var themeManager = ThemeManager.shared
+    
     init(title: String, icon: String, @ViewBuilder content: @escaping () -> Content, @ViewBuilder footer: @escaping () -> Footer = { EmptyView() }) {
         self.title = title
         self.icon = icon
@@ -258,7 +272,7 @@ struct ModernFormField<Content: View, Footer: View>: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: BrandSpacing.sm) {
-            // Label with purple icon and white text
+            // Label with purple icon and theme-aware text
             HStack(spacing: BrandSpacing.sm) {
                 Image(systemName: icon)
                     .foregroundColor(BrandColors.actionAccent) // Purple #8B5CF6
@@ -266,7 +280,12 @@ struct ModernFormField<Content: View, Footer: View>: View {
                 Text(title)
                     .font(BrandTypography.subheadline)
                     .fontWeight(.semibold)
-                    .foregroundColor(BrandColors.primaryText) // Pure white
+                    .foregroundColor(
+                        // CRITICAL: Use explicit theme-aware color to ensure proper contrast
+                        // Dark mode: White text
+                        // Light mode: Dark charcoal text
+                        themeManager.isDarkMode ? Color.white : Color(hex: "2C2C2E")
+                    )
             }
             
             // Input field content
@@ -287,6 +306,9 @@ struct CustomTextField: View {
     var keyboardType: UIKeyboardType = .default
     @FocusState private var isFocused: Bool
     
+    // CRITICAL: Observe theme changes to ensure proper updates
+    @StateObject private var themeManager = ThemeManager.shared
+    
     var body: some View {
         ZStack(alignment: .leading) {
             // Placeholder text (shown when empty)
@@ -301,7 +323,12 @@ struct CustomTextField: View {
                 .keyboardType(keyboardType)
                 .autocapitalization(.none)
                 .autocorrectionDisabled()
-                .foregroundColor(BrandColors.primaryText) // Pure white text
+                .foregroundColor(
+                    // CRITICAL: Use explicit theme-aware color to ensure proper contrast
+                    // Dark mode: White text
+                    // Light mode: Dark charcoal text
+                    themeManager.isDarkMode ? Color.white : Color(hex: "2C2C2E")
+                )
                 .font(BrandTypography.body)
                 .focused($isFocused)
                 .padding(.horizontal, BrandSpacing.md)
@@ -309,7 +336,11 @@ struct CustomTextField: View {
         .frame(height: 50) // Fixed height for better tap target
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(BrandColors.surface) // #1C1C1E
+                .fill(
+                    themeManager.isDarkMode 
+                        ? BrandColors.surface // Dark charcoal in dark mode
+                        : BrandColors.dayModeInputBackground // Very light gray in light mode
+                )
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12)
@@ -326,6 +357,9 @@ struct CustomPicker: View {
     let options: [String]
     @State private var showPicker = false
     
+    // CRITICAL: Observe theme changes to ensure proper updates
+    @StateObject private var themeManager = ThemeManager.shared
+    
     var body: some View {
         Button(action: {
             showPicker = true
@@ -333,7 +367,11 @@ struct CustomPicker: View {
             HStack {
                 Text(selection.isEmpty ? placeholder : selection)
                     .font(BrandTypography.body)
-                    .foregroundColor(selection.isEmpty ? Color(hex: "8E8E93") : BrandColors.primaryText) // Placeholder: #8E8E93, Selected: white
+                    .foregroundColor(
+                        selection.isEmpty 
+                            ? Color(hex: "8E8E93") // Placeholder: #8E8E93
+                            : (themeManager.isDarkMode ? Color.white : Color(hex: "2C2C2E")) // Selected: theme-aware
+                    )
                 
                 Spacer()
                 
@@ -345,7 +383,11 @@ struct CustomPicker: View {
             .padding(.horizontal, BrandSpacing.md)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(BrandColors.surface) // #1C1C1E
+                    .fill(
+                        themeManager.isDarkMode 
+                            ? BrandColors.surface // Dark charcoal in dark mode
+                            : BrandColors.dayModeInputBackground // Very light gray in light mode
+                    )
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
@@ -363,7 +405,10 @@ struct CustomPicker: View {
                         }) {
                             HStack {
                                 Text(option)
-                                    .foregroundColor(BrandColors.primaryText)
+                                    .foregroundColor(
+                                        // CRITICAL: Use explicit theme-aware color
+                                        themeManager.isDarkMode ? Color.white : Color(hex: "2C2C2E")
+                                    )
                                 Spacer()
                                 if selection == option {
                                     Image(systemName: "checkmark")
@@ -389,7 +434,7 @@ struct CustomPicker: View {
                     }
                 }
             }
-            .preferredColorScheme(ThemeManager.shared.isDarkMode ? .dark : .light)
+            .preferredColorScheme(themeManager.isDarkMode ? .dark : .light)
         }
     }
 }

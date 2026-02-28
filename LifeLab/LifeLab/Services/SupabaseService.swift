@@ -414,11 +414,28 @@ class SupabaseService: ObservableObject {
             var parsedError: NSError
             if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let errorMsg = errorData["error_description"] as? String ?? errorData["error"] as? String {
-                // Check for common authentication errors
-                if errorMsg.contains("Invalid login credentials") || 
-                   errorMsg.contains("Email not confirmed") ||
-                   errorMsg.contains("User not found") ||
-                   httpResponse.statusCode == 401 {
+                let errorMsgLower = errorMsg.lowercased()
+                
+                // Check for signup-specific errors (user already exists)
+                if httpResponse.statusCode == 422 || 
+                   errorMsgLower.contains("user already registered") ||
+                   errorMsgLower.contains("email already exists") ||
+                   errorMsgLower.contains("already registered") {
+                    // User already exists - mark for sign in suggestion
+                    parsedError = NSError(
+                        domain: "SupabaseService",
+                        code: httpResponse.statusCode,
+                        userInfo: [
+                            NSLocalizedDescriptionKey: errorMsg,
+                            "userAlreadyExists": true as Any
+                        ]
+                    )
+                }
+                // Check for signin-specific errors (wrong password or user not found)
+                else if errorMsgLower.contains("invalid login credentials") || 
+                        errorMsgLower.contains("email not confirmed") ||
+                        errorMsgLower.contains("user not found") ||
+                        httpResponse.statusCode == 401 {
                     // User doesn't exist or credentials are wrong - should redirect to sign up
                     parsedError = NSError(
                         domain: "SupabaseService",
@@ -722,9 +739,21 @@ class SupabaseService: ObservableObject {
         encoder.dateEncodingStrategy = .iso8601
         
         let jsonData = try encoder.encode(profile)
-        guard let dict = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any] else {
+        guard var dict = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any] else {
             throw NSError(domain: "SupabaseService", code: -5, userInfo: [NSLocalizedDescriptionKey: "Failed to encode UserProfile"])
         }
+        
+        // CRITICAL: Remove createdAt and updatedAt if they don't exist in database schema
+        // These fields may be managed by database triggers or may not exist yet
+        // If you see "Could not find column" errors, either:
+        // 1. Add these columns to database (see SUPABASE_DATABASE_MIGRATION.sql)
+        // 2. Or remove them from the dict before sending (current approach)
+        dict.removeValue(forKey: "createdAt")
+        dict.removeValue(forKey: "updatedAt")
+        
+        // CRITICAL: Database schema must match UserProfile model
+        // If you see "Could not find column" errors, run SUPABASE_DATABASE_MIGRATION.sql
+        // This ensures all columns exist in the user_profiles table
         
         return dict
     }

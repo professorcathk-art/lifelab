@@ -32,7 +32,8 @@ class ThemeManager: ObservableObject {
             return windowScene.traitCollection.userInterfaceStyle == .dark
         }
         // Fallback: check trait collection from main window
-        if let window = UIApplication.shared.windows.first {
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first {
             return window.traitCollection.userInterfaceStyle == .dark
         }
         // Default to dark mode if cannot detect

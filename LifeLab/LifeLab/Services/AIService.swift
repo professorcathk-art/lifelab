@@ -71,7 +71,7 @@ class AIService {
         return nil
     }
     
-    private func makeAPIRequest(messages: [[String: Any]]) async throws -> String {
+    private func makeAPIRequest(messages: [[String: Any]], maxTokens: Int = 2000) async throws -> String {
         guard let url = URL(string: APIConfig.aimlAPIURL) else {
             throw NSError(domain: "AIService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid API URL"])
         }
@@ -84,7 +84,7 @@ class AIService {
         let requestBody: [String: Any] = [
             "model": APIConfig.model,
             "messages": messages,
-            "max_tokens": 3000,  // Reduced to save tokens while still getting complete responses
+            "max_tokens": maxTokens,
             "temperature": 0.7
         ]
         
@@ -95,11 +95,14 @@ class AIService {
         print("🔵 API Key (first 10 chars): \(String(APIConfig.aimlAPIKey.prefix(10)))...")
         print("🔵 Request body size: \(request.httpBody?.count ?? 0) bytes")
         
-        // Configure URLSession with NO timeout - let it load until completion
+        // Configure URLSession for long-running requests
+        // Use default configuration with extended timeouts to allow requests to continue
+        // Note: beginBackgroundTask in ViewModel handles background execution
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = TimeInterval.infinity  // No timeout - wait indefinitely
-        config.timeoutIntervalForResource = TimeInterval.infinity  // No timeout - wait indefinitely
+        config.timeoutIntervalForRequest = 300.0  // 5 minutes (reasonable timeout for AI generation)
+        config.timeoutIntervalForResource = 600.0  // 10 minutes (total resource timeout)
         config.waitsForConnectivity = true  // Wait for network connectivity
+        config.allowsCellularAccess = true  // Allow cellular networks
         config.requestCachePolicy = .reloadIgnoringLocalCacheData  // Don't use cache
         let session = URLSession(configuration: config)
         
@@ -213,9 +216,18 @@ class AIService {
     }
     
     func generateLifeBlueprint(profile: UserProfile) async throws -> LifeBlueprint {
-        let interests = profile.interests.joined(separator: "、")
-        let strengths = profile.strengths.flatMap { $0.selectedKeywords }.joined(separator: "、")
-        let strengthsAnswers = profile.strengths.compactMap { $0.userAnswer }.filter { !$0.isEmpty }.joined(separator: "\n")
+        // OPTIMIZED: Limit input to speed up generation and reduce timeout risk
+        // Limit interests to top 10
+        let limitedInterests = profile.interests.prefix(10)
+        let interests = limitedInterests.joined(separator: "、")
+        
+        // Limit strengths to top 15 keywords
+        let allStrengths = profile.strengths.flatMap { $0.selectedKeywords }
+        let limitedStrengths = allStrengths.prefix(15)
+        let strengths = limitedStrengths.joined(separator: "、")
+        
+        // Limit strength answers to first 3 (most important)
+        let strengthsAnswers = profile.strengths.compactMap { $0.userAnswer }.filter { !$0.isEmpty }.prefix(3).joined(separator: "\n")
         let topValues = profile.values.sorted { $0.rank < $1.rank && !$0.isGreyedOut }.prefix(3).map { $0.value.rawValue }.joined(separator: "、")
         
         // Build context with ALL available user data
@@ -244,7 +256,7 @@ class AIService {
             context += "\n"
         }
         
-        // Initial Scan Data (初步掃描資料)
+        // Initial Scan Data (初步掃描資料) - OPTIMIZED: Already limited above
         context += "初步掃描資料：\n"
         context += "- 興趣：\(interests.isEmpty ? "無" : interests)\n"
         context += "- 天賦關鍵詞：\(strengths.isEmpty ? "無" : strengths)\n"
@@ -583,18 +595,27 @@ class AIService {
     }
     
     func generateLifeBlueprint(interests: [String], strengths: [StrengthResponse], values: [ValueRanking], flowDiary: [FlowDiaryEntry] = [], valuesQuestions: ValuesQuestions? = nil, resourceInventory: ResourceInventory? = nil, acquiredStrengths: AcquiredStrengths? = nil, feasibilityAssessment: FeasibilityAssessment? = nil) async throws -> LifeBlueprint {
-        let interestsText = interests.joined(separator: "、")
-        let strengthsText = strengths.flatMap { $0.selectedKeywords }.joined(separator: "、")
-        let strengthsAnswers = strengths.compactMap { $0.userAnswer }.filter { !$0.isEmpty }.joined(separator: "\n")
+        // OPTIMIZED: Limit input to speed up generation and reduce timeout risk
+        // Limit interests to top 10
+        let limitedInterests = interests.prefix(10)
+        let interestsText = limitedInterests.joined(separator: "、")
+        
+        // Limit strengths to top 15 keywords
+        let allStrengths = strengths.flatMap { $0.selectedKeywords }
+        let limitedStrengths = allStrengths.prefix(15)
+        let strengthsText = limitedStrengths.joined(separator: "、")
+        
+        // Limit strength answers to first 3 (most important)
+        let strengthsAnswers = strengths.compactMap { $0.userAnswer }.filter { !$0.isEmpty }.prefix(3).joined(separator: "\n")
         let topValues = values.sorted { $0.rank < $1.rank && !$0.isGreyedOut }.prefix(3).map { $0.value.rawValue }.joined(separator: "、")
         
         var context = "用戶資料：\n"
-        context += "- 興趣：\(interestsText)\n"
-        context += "- 天賦關鍵詞：\(strengthsText)\n"
+        context += "- 興趣：\(interestsText.isEmpty ? "無" : interestsText)\n"
+        context += "- 天賦關鍵詞：\(strengthsText.isEmpty ? "無" : strengthsText)\n"
         if !strengthsAnswers.isEmpty {
             context += "- 天賦回答：\(strengthsAnswers)\n"
         }
-        context += "- 核心價值觀：\(topValues)\n"
+        context += "- 核心價值觀：\(topValues.isEmpty ? "無" : topValues)\n"
         
         // Add deepening exploration data if available
         if !flowDiary.isEmpty {
@@ -1006,7 +1027,8 @@ class AIService {
             ]
         ]
         
-        let response = try await makeAPIRequest(messages: messages)
+        // Use higher max_tokens for action plan (more complex JSON structure)
+        let response = try await makeAPIRequest(messages: messages, maxTokens: 3000)
         
         // Try to extract JSON from response (might have markdown code blocks)
         var jsonString = response.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1023,11 +1045,66 @@ class AIService {
         }
         jsonString = jsonString.trimmingCharacters(in: .whitespacesAndNewlines)
         
-        // Parse JSON response
-        guard let jsonData = jsonString.data(using: .utf8),
-              let json = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any] else {
-            print("Action plan JSON parsing failed, using fallback. Response: \(response.prefix(200))")
+        // Try to find JSON object boundaries if response is malformed - with safe bounds checking
+        if let jsonStart = jsonString.range(of: "{"), jsonStart.lowerBound < jsonString.endIndex {
+            jsonString = String(jsonString[jsonStart.lowerBound..<jsonString.endIndex])
+        }
+        if let jsonEnd = jsonString.range(of: "}", options: .backwards), jsonEnd.upperBound <= jsonString.endIndex {
+            jsonString = String(jsonString[jsonString.startIndex..<jsonEnd.upperBound])
+        }
+        
+        // Parse JSON response with better error handling for truncated responses
+        print("🔵 Attempting to parse action plan JSON from response...")
+        print("🔵 JSON string length: \(jsonString.count) characters")
+        print("🔵 JSON string preview: \(jsonString.prefix(300))...")
+        print("🔵 JSON string end: ...\(jsonString.suffix(200))")
+        
+        guard let jsonData = jsonString.data(using: .utf8) else {
+            print("❌ Failed to convert JSON string to Data")
+            print("❌ Response preview: \(response.prefix(200))")
             return try await generateActionPlanFallback()
+        }
+        
+        // Try to parse JSON with better error handling
+        var json: [String: Any]
+        do {
+            guard let parsedJson = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any] else {
+                print("❌ JSON is not a dictionary")
+                return try await generateActionPlanFallback()
+            }
+            json = parsedJson
+        } catch let parseError as NSError {
+            print("❌ JSON parsing failed: \(parseError.localizedDescription)")
+            if let errorIndex = parseError.userInfo["NSJSONSerializationErrorIndex"] as? Int {
+                print("❌ Error at index: \(errorIndex)")
+                // Check if response was truncated (common cause of "Unterminated string")
+                if parseError.localizedDescription.contains("Unterminated string") {
+                    print("⚠️ JSON string appears to be truncated!")
+                    print("⚠️ Attempting to extract partial JSON...")
+                    
+                    // Try to extract what we can from partial JSON
+                    if let partialJsonString = extractPartialJSON(from: jsonString) {
+                        print("✅ Successfully extracted partial JSON!")
+                        if let partialData = partialJsonString.data(using: .utf8),
+                           let partialJson = try? JSONSerialization.jsonObject(with: partialData) as? [String: Any] {
+                            json = partialJson
+                            print("✅ Using partial JSON with \(partialJson.keys.count) keys")
+                        } else {
+                            print("❌ Failed to parse extracted partial JSON, using fallback")
+                            return try await generateActionPlanFallback()
+                        }
+                    } else {
+                        print("❌ Could not extract partial JSON, using fallback")
+                        return try await generateActionPlanFallback()
+                    }
+                } else {
+                    print("❌ JSON parsing error is not truncation-related, using fallback")
+                    return try await generateActionPlanFallback()
+                }
+            } else {
+                print("❌ Unknown JSON parsing error, using fallback")
+                return try await generateActionPlanFallback()
+            }
         }
         
         let dateFormatter = DateFormatter()

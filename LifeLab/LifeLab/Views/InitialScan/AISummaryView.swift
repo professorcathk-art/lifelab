@@ -2,6 +2,9 @@ import SwiftUI
 
 struct AISummaryView: View {
     @EnvironmentObject var viewModel: InitialScanViewModel
+    @StateObject private var themeManager = ThemeManager.shared
+    @EnvironmentObject var dataService: DataService
+    var isReviewMode: Bool = false // Flag to indicate if in review mode
     
     var body: some View {
         ScrollView {
@@ -67,30 +70,105 @@ struct AISummaryView: View {
                 }
                 .frame(maxWidth: ResponsiveLayout.maxContentWidth())
                 
-                // Next button - goes to loading animation
+                // Button - different for review mode vs initial scan
                 if !viewModel.aiSummary.isEmpty {
-                    Button(action: {
-                        // Move to loading animation (before payment)
-                        viewModel.currentStep = .loading
-                    }) {
-                        HStack(spacing: BrandSpacing.sm) {
-                            Text("下一題")
-                                .font(BrandTypography.headline)
-                                .fontWeight(.bold)
-                            Image(systemName: "arrow.right")
-                                .font(.system(size: 16, weight: .bold))
+                    if isReviewMode {
+                        // Review mode: Show regenerate button
+                        Button(action: {
+                            // Regenerate AI summary
+                            viewModel.generateAISummary()
+                        }) {
+                            HStack(spacing: BrandSpacing.sm) {
+                                if viewModel.isLoadingSummary {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(
+                                            tint: themeManager.isDarkMode ? Color.black : Color.white
+                                        ))
+                                        .scaleEffect(0.9)
+                                } else {
+                                    Image(systemName: "arrow.clockwise")
+                                        .font(.system(size: 16, weight: .bold))
+                                }
+                                Text(viewModel.isLoadingSummary ? "正在重新生成..." : "重新生成 AI 分析總結")
+                                    .font(BrandTypography.headline)
+                                    .fontWeight(.bold)
+                            }
+                            .foregroundColor(
+                                // CRITICAL: Ensure proper contrast
+                                // Dark mode: White background → Black text
+                                // Light mode: Purple background → White text
+                                themeManager.isDarkMode ? Color.black : Color.white
+                            )
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(
+                                // CRITICAL: Ensure proper contrast
+                                // Dark mode: White background
+                                // Light mode: Purple background
+                                themeManager.isDarkMode ? Color.white : BrandColors.actionAccent
+                            )
+                            .clipShape(Capsule()) // Pill shape
                         }
-                        .foregroundColor(BrandColors.invertedText) // Black text on white button
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                        .background(BrandColors.primaryText) // White background
-                        .clipShape(Capsule()) // Pill shape
+                        .buttonStyle(.plain)
+                        .disabled(viewModel.isLoadingSummary)
+                        .padding(.horizontal, ResponsiveLayout.horizontalPadding())
+                        .padding(.top, BrandSpacing.xxl)
+                        .padding(.bottom, BrandSpacing.xxxl)
+                        .frame(maxWidth: ResponsiveLayout.maxContentWidth())
+                        .onChange(of: viewModel.aiSummary) { newSummary in
+                            // When AI summary is regenerated, save to user profile
+                            if !newSummary.isEmpty && !viewModel.isLoadingSummary {
+                                dataService.updateUserProfile { profile in
+                                    // Update strengthsSummary in lifeBlueprint if it exists
+                                    if var blueprint = profile.lifeBlueprint {
+                                        blueprint.strengthsSummary = newSummary
+                                        profile.lifeBlueprint = blueprint
+                                    }
+                                    // Also update in all versions if they exist
+                                    if !profile.lifeBlueprints.isEmpty {
+                                        for i in profile.lifeBlueprints.indices {
+                                            profile.lifeBlueprints[i].strengthsSummary = newSummary
+                                        }
+                                    }
+                                }
+                                print("✅ AI summary updated in user profile")
+                            }
+                        }
+                    } else {
+                        // Initial scan mode: Show next button
+                        Button(action: {
+                            // Move to loading animation (before payment)
+                            viewModel.currentStep = .loading
+                        }) {
+                            HStack(spacing: BrandSpacing.sm) {
+                                Text("下一題")
+                                    .font(BrandTypography.headline)
+                                    .fontWeight(.bold)
+                                Image(systemName: "arrow.right")
+                                    .font(.system(size: 16, weight: .bold))
+                            }
+                            .foregroundColor(
+                                // CRITICAL: Ensure proper contrast
+                                // Dark mode: White background → Black text
+                                // Light mode: Dark charcoal background → White text
+                                themeManager.isDarkMode ? Color.black : Color.white
+                            )
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(
+                                // CRITICAL: Ensure proper contrast
+                                // Dark mode: White background
+                                // Light mode: Dark charcoal background
+                                themeManager.isDarkMode ? Color.white : BrandColors.primaryText
+                            )
+                            .clipShape(Capsule()) // Pill shape
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, ResponsiveLayout.horizontalPadding())
+                        .padding(.top, BrandSpacing.xxl)
+                        .padding(.bottom, BrandSpacing.xxxl)
+                        .frame(maxWidth: ResponsiveLayout.maxContentWidth())
                     }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, ResponsiveLayout.horizontalPadding())
-                    .padding(.top, BrandSpacing.xxl)
-                    .padding(.bottom, BrandSpacing.xxxl)
-                    .frame(maxWidth: ResponsiveLayout.maxContentWidth())
                 }
             }
             .frame(maxWidth: .infinity)

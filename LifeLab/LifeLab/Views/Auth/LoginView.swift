@@ -15,6 +15,8 @@ struct LoginView: View {
     @State private var forgotPasswordEmail = ""
     @State private var isResettingPassword = false
     @State private var showResetSuccess = false
+    @State private var hasReadTerms = false
+    @State private var showPrivacyPolicy = false
     
     var body: some View {
         ZStack {
@@ -142,9 +144,17 @@ struct LoginView: View {
                                         .foregroundColor(BrandColors.actionAccent)
                                 }
                             }
-                            .buttonStyle(.plain)
-                            .padding(.top, -BrandSpacing.sm)
+                        .buttonStyle(.plain)
+                        .padding(.top, -BrandSpacing.sm)
                         }
+                        
+                        // AI Service Consent Checkbox
+                        AIConsentCheckbox(
+                            hasReadTerms: $hasReadTerms,
+                            showPrivacyPolicy: $showPrivacyPolicy
+                        )
+                        .padding(.horizontal, BrandSpacing.xl)
+                        .padding(.top, BrandSpacing.md)
                         
                         // Submit button - CTA Button
                         Button(action: {
@@ -168,13 +178,20 @@ struct LoginView: View {
                                         .font(.system(size: 16, weight: .bold))
                                 }
                             }
-                            .foregroundColor(BrandColors.invertedText)
+                            .foregroundColor(
+                                // CRITICAL: Ensure proper contrast in both modes
+                                // Dark mode: White background → Black text
+                                // Light mode: Purple background → White text
+                                (isLoading || email.isEmpty || password.isEmpty || (isSignUp && name.isEmpty) || !hasReadTerms)
+                                    ? (themeManager.isDarkMode ? Color(hex: "9CA3AF") : Color(hex: "8E8E93")) // Disabled: Muted gray text
+                                    : (themeManager.isDarkMode ? Color.black : Color.white) // Enabled: Black (dark) or White (light)
+                            )
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, BrandSpacing.md)
                             .background(
-                                (isLoading || email.isEmpty || password.isEmpty || (isSignUp && name.isEmpty))
+                                (isLoading || email.isEmpty || password.isEmpty || (isSignUp && name.isEmpty) || !hasReadTerms)
                                     ? (themeManager.isDarkMode ? Color(hex: "333333") : Color(hex: "E2DDFF")) // Disabled: Dark gray (dark) or Light purple-gray (day)
-                                    : (themeManager.isDarkMode ? BrandColors.primaryText : BrandColors.actionAccent) // Enabled: White (dark) or Purple (day)
+                                    : (themeManager.isDarkMode ? Color.white : BrandColors.actionAccent) // Enabled: White (dark) or Purple (day)
                             )
                             .clipShape(Capsule())
                             .shadow(
@@ -254,10 +271,11 @@ struct LoginView: View {
             }
         }
         .preferredColorScheme(themeManager.isDarkMode ? .dark : .light)
-        .alert("錯誤", isPresented: $showError) {
+        .alert("", isPresented: $showError) {
             Button("確定", role: .cancel) { }
         } message: {
             Text(errorMessage)
+                .font(BrandTypography.body)
         }
         .alert("忘記密碼", isPresented: $showForgotPassword) {
             TextField("電子郵件", text: $forgotPasswordEmail)
@@ -283,6 +301,9 @@ struct LoginView: View {
         } message: {
             Text("密碼重置連結已發送到您的電子郵件。請檢查您的收件箱。")
         }
+        .sheet(isPresented: $showPrivacyPolicy) {
+            PrivacyPolicyView()
+        }
     }
     
     private func handleForgotPassword() async {
@@ -306,50 +327,107 @@ struct LoginView: View {
     }
     
     private func handleEmailAuth() async {
+        // CRITICAL: Save AI consent before authentication
+        guard hasReadTerms else {
+            await MainActor.run {
+                errorMessage = "請先閱讀並同意 AI 服務使用條款"
+                showError = true
+            }
+            return
+        }
+        
+        // Save consent to UserDefaults (user-specific, will be set after login)
+        if let userId = authService.currentUser?.id {
+            let consentKey = "lifelab_ai_consent_\(userId)"
+            UserDefaults.standard.set(true, forKey: consentKey)
+        } else {
+            // For new users, save with temporary key, will update after login
+            UserDefaults.standard.set(true, forKey: "lifelab_ai_consent_pending")
+        }
+        
         isLoading = true
         do {
             if isSignUp {
                 try await authService.signUpWithEmail(email: email, password: password, name: name)
+                // After successful signup, save consent with actual user ID
+                if let userId = authService.currentUser?.id {
+                    let consentKey = "lifelab_ai_consent_\(userId)"
+                    UserDefaults.standard.set(true, forKey: consentKey)
+                    UserDefaults.standard.removeObject(forKey: "lifelab_ai_consent_pending")
+                }
             } else {
                 try await authService.signInWithEmail(email: email, password: password)
+                // After successful signin, save consent with actual user ID
+                if let userId = authService.currentUser?.id {
+                    let consentKey = "lifelab_ai_consent_\(userId)"
+                    UserDefaults.standard.set(true, forKey: consentKey)
+                    UserDefaults.standard.removeObject(forKey: "lifelab_ai_consent_pending")
+                }
             }
         } catch {
             await MainActor.run {
                 let nsError = error as NSError
                 
-                // Check if this is a "user not found" or "invalid credentials" error
-                // If so, suggest user to sign up instead
+                // Professional error message handling
                 if nsError.domain == "SupabaseService" {
-                    let errorMsg = nsError.localizedDescription
-                    if errorMsg.contains("Invalid login credentials") ||
-                       errorMsg.contains("User not found") ||
-                       errorMsg.contains("Email not confirmed") ||
-                       nsError.code == 401 ||
-                       nsError.userInfo["shouldShowSignUp"] != nil {
-                        // User doesn't exist or account was deleted - suggest sign up
-                        errorMessage = "帳號不存在或密碼錯誤。\n\n是否要建立新帳號？"
-                        showError = true
-                        // Automatically switch to sign up mode
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                            isSignUp = true
+                    let errorMsg = nsError.localizedDescription.lowercased()
+                    let statusCode = nsError.code
+                    
+                    if isSignUp {
+                        // Sign up errors
+                        if nsError.userInfo["userAlreadyExists"] != nil ||
+                           errorMsg.contains("user already registered") ||
+                           errorMsg.contains("email already exists") ||
+                           errorMsg.contains("already registered") ||
+                           statusCode == 422 {
+                            // User already exists - suggest sign in
+                            errorMessage = "此電子郵件地址已被註冊。\n\n請使用「登錄」功能登入您的帳號，或使用其他電子郵件地址註冊。"
+                            showError = true
+                            // Automatically switch to sign in mode
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                isSignUp = false
+                            }
+                        } else if errorMsg.contains("password") && errorMsg.contains("weak") {
+                            errorMessage = "密碼強度不足。\n\n請使用至少 6 個字符的密碼，建議包含字母和數字。"
+                            showError = true
+                        } else if errorMsg.contains("email") && errorMsg.contains("invalid") {
+                            errorMessage = "電子郵件格式不正確。\n\n請檢查您輸入的電子郵件地址是否正確。"
+                            showError = true
+                        } else {
+                            // Generic sign up error
+                            errorMessage = "註冊失敗。\n\n\(nsError.localizedDescription)\n\n請稍後再試，或聯繫客服尋求協助。"
+                            showError = true
                         }
                     } else {
-                        errorMessage = errorMsg
-                        showError = true
+                        // Sign in errors
+                        if errorMsg.contains("invalid login credentials") ||
+                           errorMsg.contains("user not found") ||
+                           errorMsg.contains("email not confirmed") ||
+                           statusCode == 401 ||
+                           nsError.userInfo["shouldShowSignUp"] != nil {
+                            // Wrong password or user doesn't exist
+                            errorMessage = "電子郵件或密碼不正確。\n\n請檢查：\n• 電子郵件地址是否正確\n• 密碼是否正確（注意大小寫）\n• 是否已註冊帳號\n\n如果忘記密碼，請使用「忘記密碼？」功能。"
+                            showError = true
+                        } else {
+                            // Generic sign in error
+                            errorMessage = "登錄失敗。\n\n\(nsError.localizedDescription)\n\n請稍後再試，或聯繫客服尋求協助。"
+                            showError = true
+                        }
                     }
                 } else if nsError.domain == NSURLErrorDomain {
-                    // Network error
+                    // Network error - professional message
                     let networkErrorMsg = nsError.localizedDescription
                     if nsError.code == NSURLErrorNetworkConnectionLost ||
                        nsError.code == NSURLErrorNotConnectedToInternet ||
                        nsError.code == NSURLErrorTimedOut {
-                        errorMessage = "網絡連接失敗。\n\n請檢查：\n1. 設備是否連接到互聯網\n2. 網絡信號是否穩定\n3. 稍後再試"
+                        errorMessage = "無法連接到網絡。\n\n請檢查：\n• 設備是否已連接到 Wi‑Fi 或行動網絡\n• 網絡信號是否穩定\n• 是否開啟了飛行模式\n\n確認後請稍後再試。"
                     } else {
-                        errorMessage = "網絡錯誤：\(networkErrorMsg)"
+                        errorMessage = "網絡連接出現問題。\n\n\(networkErrorMsg)\n\n請檢查您的網絡連接後再試。"
                     }
                     showError = true
                 } else {
-                    errorMessage = error.localizedDescription
+                    // Generic error - professional message
+                    errorMessage = "發生錯誤。\n\n\(error.localizedDescription)\n\n請稍後再試，如問題持續存在，請聯繫客服。"
                     showError = true
                 }
                 
@@ -359,11 +437,27 @@ struct LoginView: View {
     }
     
     private func handleAppleSignIn(result: Result<ASAuthorization, Error>) {
+        // CRITICAL: Check consent before Apple Sign In
+        guard hasReadTerms else {
+            errorMessage = "請先閱讀並同意 AI 服務使用條款"
+            showError = true
+            return
+        }
+        
+        // Save consent (will update with user ID after login)
+        UserDefaults.standard.set(true, forKey: "lifelab_ai_consent_pending")
+        
         Task {
             do {
                 switch result {
                 case .success(let authorization):
                     try await authService.signInWithApple(authorization: authorization)
+                    // After successful signin, save consent with actual user ID
+                    if let userId = authService.currentUser?.id {
+                        let consentKey = "lifelab_ai_consent_\(userId)"
+                        UserDefaults.standard.set(true, forKey: consentKey)
+                        UserDefaults.standard.removeObject(forKey: "lifelab_ai_consent_pending")
+                    }
                 case .failure(let error):
                     let nsError = error as NSError
                     var errorMsg = error.localizedDescription
@@ -411,6 +505,9 @@ struct ModernTextField: View {
     let placeholder: String
     var keyboardType: UIKeyboardType = .default
     
+    // CRITICAL: Observe theme changes to ensure proper updates
+    @StateObject private var themeManager = ThemeManager.shared
+    
     var body: some View {
         VStack(alignment: .leading, spacing: BrandSpacing.sm) {
             HStack(spacing: BrandSpacing.sm) {
@@ -419,20 +516,28 @@ struct ModernTextField: View {
                     .font(.system(size: 14))
                 Text(title)
                     .font(BrandTypography.subheadline)
-                    .fontWeight(ThemeManager.shared.isDarkMode ? .bold : .medium)
-                    .foregroundColor(BrandColors.primaryText)
+                    .fontWeight(themeManager.isDarkMode ? .bold : .medium)
+                    .foregroundColor(
+                        // CRITICAL: Use explicit theme-aware color to ensure proper contrast
+                        // Dark mode: White text
+                        // Light mode: Dark charcoal text
+                        themeManager.isDarkMode ? Color.white : Color(hex: "2C2C2E")
+                    )
             }
             
             TextField("", text: $text, prompt: Text(placeholder).foregroundColor(BrandColors.secondaryText))
                 .keyboardType(keyboardType)
                 .autocapitalization(keyboardType == .emailAddress ? .none : .words)
                 .autocorrectionDisabled(keyboardType == .emailAddress)
-                .foregroundColor(BrandColors.primaryText)
+                .foregroundColor(
+                    // CRITICAL: Use explicit theme-aware color
+                    themeManager.isDarkMode ? Color.white : Color(hex: "2C2C2E")
+                )
                 .padding(BrandSpacing.md)
                 .background(
                     RoundedRectangle(cornerRadius: 12)
                         .fill(
-                            ThemeManager.shared.isDarkMode 
+                            themeManager.isDarkMode 
                                 ? BrandColors.surface // Dark charcoal in dark mode
                                 : BrandColors.dayModeInputBackground // Very light gray #F0F0F5 in day mode
                         )
@@ -451,6 +556,9 @@ struct ModernSecureField: View {
     let placeholder: String
     @State private var isSecure = true
     
+    // CRITICAL: Observe theme changes to ensure proper updates
+    @StateObject private var themeManager = ThemeManager.shared
+    
     var body: some View {
         VStack(alignment: .leading, spacing: BrandSpacing.sm) {
             HStack(spacing: BrandSpacing.sm) {
@@ -459,17 +567,28 @@ struct ModernSecureField: View {
                     .font(.system(size: 14))
                 Text(title)
                     .font(BrandTypography.subheadline)
-                    .fontWeight(ThemeManager.shared.isDarkMode ? .bold : .medium)
-                    .foregroundColor(BrandColors.primaryText)
+                    .fontWeight(themeManager.isDarkMode ? .bold : .medium)
+                    .foregroundColor(
+                        // CRITICAL: Use explicit theme-aware color to ensure proper contrast
+                        // Dark mode: White text
+                        // Light mode: Dark charcoal text
+                        themeManager.isDarkMode ? Color.white : Color(hex: "2C2C2E")
+                    )
             }
             
             HStack {
                 if isSecure {
                     SecureField("", text: $text, prompt: Text(placeholder).foregroundColor(BrandColors.secondaryText))
-                        .foregroundColor(BrandColors.primaryText)
+                        .foregroundColor(
+                            // CRITICAL: Use explicit theme-aware color
+                            themeManager.isDarkMode ? Color.white : Color(hex: "2C2C2E")
+                        )
                 } else {
                     TextField("", text: $text, prompt: Text(placeholder).foregroundColor(BrandColors.secondaryText))
-                        .foregroundColor(BrandColors.primaryText)
+                        .foregroundColor(
+                            // CRITICAL: Use explicit theme-aware color
+                            themeManager.isDarkMode ? Color.white : Color(hex: "2C2C2E")
+                        )
                 }
                 
                 Button(action: {
@@ -487,7 +606,7 @@ struct ModernSecureField: View {
             .background(
                 RoundedRectangle(cornerRadius: 12)
                     .fill(
-                        ThemeManager.shared.isDarkMode 
+                        themeManager.isDarkMode 
                             ? BrandColors.surface // Dark charcoal in dark mode
                             : BrandColors.dayModeInputBackground // Very light gray #F0F0F5 in day mode
                     )

@@ -268,13 +268,15 @@ struct ProfileView: View {
 struct ProfileSection: View {
     let title: String
     let items: [String]
+    // CRITICAL: Observe theme changes to ensure proper updates
+    @StateObject private var themeManager = ThemeManager.shared
     
     var body: some View {
         VStack(alignment: .leading, spacing: BrandSpacing.md) {
             Text(title)
                 .font(BrandTypography.title2)
                 .fontWeight(.semibold)
-                .foregroundColor(BrandColors.primaryText)
+                .foregroundColor(BrandColors.primaryText) // Theme-aware: white in dark mode, dark charcoal in light mode
                 .padding(.horizontal, ResponsiveLayout.horizontalPadding())
             
             ScrollView(.horizontal, showsIndicators: false) {
@@ -282,13 +284,13 @@ struct ProfileSection: View {
                     ForEach(items, id: \.self) { item in
                         Text(item)
                             .font(BrandTypography.subheadline)
-                            .foregroundColor(BrandColors.primaryText)
+                            .foregroundColor(BrandColors.primaryText) // Theme-aware: white in dark mode, dark charcoal in light mode
                             .padding(.horizontal, BrandSpacing.md)
                             .padding(.vertical, BrandSpacing.sm)
-                            .background(BrandColors.surface)
+                            .background(BrandColors.surface) // Theme-aware: dark charcoal (#1C1C1E) in dark mode, white in light mode
                             .overlay(
                                 RoundedRectangle(cornerRadius: BrandRadius.large)
-                                    .stroke(BrandColors.borderColor, lineWidth: 1)
+                                    .stroke(BrandColors.borderColor, lineWidth: 1) // Theme-aware border
                             )
                             .cornerRadius(BrandRadius.large) // Capsule shape
                     }

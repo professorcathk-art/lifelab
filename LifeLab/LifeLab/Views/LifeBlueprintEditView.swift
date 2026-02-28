@@ -313,6 +313,7 @@ struct LifeBlueprintEditView: View {
         .background(BrandColors.background)
         .navigationTitle("編輯生命藍圖")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true) // CRITICAL: Hide default back button to prevent duplicate
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button(action: {

@@ -13,6 +13,9 @@ class DataService: ObservableObject {
     @Published var userProfile: UserProfile?
     @Published var isSyncing = false
     @Published var lastSyncTime: Date?
+    // CRITICAL: Shared state for action plan generation across multiple views
+    // This ensures button disappears in both DeepeningExplorationView and TaskManagementView
+    @Published var isGeneratingActionPlan: Bool = false
     
     // Use user-specific keys to ensure data isolation between users
     private var userDefaultsKey: String {

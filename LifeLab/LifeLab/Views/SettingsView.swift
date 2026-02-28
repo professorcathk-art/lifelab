@@ -45,11 +45,12 @@ struct SettingsView: View {
                 }
                 
                 Section("數據管理") {
-                    Button(action: {
-                        exportAllData()
-                    }) {
-                        Label("導出所有數據", systemImage: "square.and.arrow.up")
-                    }
+                    // Temporarily hidden - export functionality not working
+                    // Button(action: {
+                    //     exportAllData()
+                    // }) {
+                    //     Label("導出所有數據", systemImage: "square.and.arrow.up")
+                    // }
                     
                     Button(action: {
                         showDeleteAlert = true
@@ -238,7 +239,26 @@ struct SettingsView: View {
     }
     
     private func clearAllData() {
+        // Clear user profile data
         DataService.shared.clearUserProfile()
+        
+        // Clear AI consent status
+        if let userId = authService.currentUser?.id {
+            let consentKey = "lifelab_ai_consent_\(userId)"
+            UserDefaults.standard.removeObject(forKey: consentKey)
+        } else {
+            // Fallback: clear consent for unauthenticated users
+            UserDefaults.standard.removeObject(forKey: "lifelab_ai_consent")
+        }
+        
+        // Clear any other user-specific data
+        if let userId = authService.currentUser?.id {
+            UserDefaults.standard.removeObject(forKey: "lifelab_last_sync_time_\(userId)")
+        }
+        
+        // The ContentView will automatically detect that hasCompletedInitialScan is false
+        // and will show InitialScanView with currentStep = .basicInfo (first page)
+        print("✅ All data cleared. User will be redirected to initial scan.")
     }
     
     private func deleteAccount() async {

@@ -76,8 +76,9 @@ struct ReviewInitialScanView: View {
                             hasUnsavedChanges = true
                         }
                 case .aiSummary:
-                    AISummaryView()
+                    AISummaryView(isReviewMode: true)
                         .environmentObject(viewModel)
+                        .environmentObject(dataService)
                 default:
                     // Skip loading, payment, and blueprint steps in review mode
                     EmptyView()
@@ -206,9 +207,19 @@ struct ReviewInitialScanView: View {
             profile.strengths = viewModel.strengths
             profile.values = viewModel.selectedValues
             
-            // If AI summary was regenerated, update it
+            // If AI summary was regenerated, update it in lifeBlueprint
             if !viewModel.aiSummary.isEmpty {
-                // AI summary is stored separately, update if needed
+                // Update strengthsSummary in lifeBlueprint if it exists
+                if var blueprint = profile.lifeBlueprint {
+                    blueprint.strengthsSummary = viewModel.aiSummary
+                    profile.lifeBlueprint = blueprint
+                }
+                // Also update in all versions if they exist
+                if !profile.lifeBlueprints.isEmpty {
+                    for i in profile.lifeBlueprints.indices {
+                        profile.lifeBlueprints[i].strengthsSummary = viewModel.aiSummary
+                    }
+                }
             }
         }
         

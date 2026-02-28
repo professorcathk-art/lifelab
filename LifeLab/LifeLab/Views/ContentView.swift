@@ -29,41 +29,51 @@ struct ContentView: View {
                 
                 // Use onChange to immediately react to blueprint changes
                 if hasCompletedInitialScan {
-                    // Check subscription status before showing main app
-                    if hasValidSubscription {
-                        MainTabView()
-                            .environmentObject(dataService)
-                            .environmentObject(themeManager)
-                            .onAppear {
-                                configureTabBarAppearance()
-                                // Check subscription status periodically
+                    // CRITICAL: If user has blueprint, they should ALWAYS see MainTabView
+                    // Don't check subscription here - subscription check is for payment, not for access
+                    // Once blueprint is generated, user has access to the app
+                    MainTabView()
+                        .environmentObject(dataService)
+                        .environmentObject(themeManager)
+                        .onAppear {
+                            configureTabBarAppearance()
+                            // Check subscription status periodically (for renewal reminders)
+                            Task {
+                                await subscriptionManager.checkSubscriptionStatus()
+                            }
+                        }
+                        .onChange(of: themeManager.isDarkMode) { _ in
+                            configureTabBarAppearance()
+                        }
+                        .onChange(of: subscriptionManager.hasActiveSubscription) { hasActive in
+                            // CRITICAL: Only show alert if user already has blueprint AND subscription actually expired
+                            // Don't show alert if:
+                            // 1. User doesn't have blueprint yet (they're still in initial scan)
+                            // 2. Subscription check fails due to network issues
+                            // 3. User just purchased (subscription might not be synced yet)
+                            
+                            // Only check if user has completed initial scan (has blueprint)
+                            guard hasCompletedInitialScan else {
+                                print("ℹ️ User hasn't completed initial scan yet, skipping subscription expiry check")
+                                return
+                            }
+                            
+                            if !hasActive {
+                                // Wait a bit before checking again (might be network issue or sync delay)
                                 Task {
+                                    try? await Task.sleep(nanoseconds: 2_000_000_000) // Wait 2 seconds
+                                    // Re-check to see if it's a network issue or sync delay
                                     await subscriptionManager.checkSubscriptionStatus()
+                                    
+                                    // Only show alert if still false after re-check AND user has blueprint
+                                    if !subscriptionManager.hasActiveSubscription && hasCompletedInitialScan {
+                                        await MainActor.run {
+                                            showSubscriptionExpiredAlert = true
+                                        }
+                                    }
                                 }
                             }
-                            .onChange(of: themeManager.isDarkMode) { _ in
-                                configureTabBarAppearance()
-                            }
-                            .onChange(of: subscriptionManager.hasActiveSubscription) { hasActive in
-                                if !hasActive {
-                                    showSubscriptionExpiredAlert = true
-                                }
-                            }
-                    } else {
-                        // Subscription expired - show payment page directly for renewal
-                        // This simplifies the renewal flow and avoids navigation issues
-                        InitialScanView()
-                            .environmentObject(viewModel)
-                            .environmentObject(themeManager)
-                            .onAppear {
-                                // Set to payment step
-                                viewModel.currentStep = .payment
-                                // Load products
-                                Task {
-                                    await paymentService.loadProducts()
-                                }
-                            }
-                    }
+                        }
                 } else {
                     InitialScanView()
                         .environmentObject(viewModel)
@@ -78,43 +88,43 @@ struct ContentView: View {
                                 // Restore state based on completion progress
                                 // Priority: blueprint > payment > aiSummary > values > strengths > interests > basicInfo
                                 if profile.lifeBlueprint != nil {
-                                    // User has completed everything
+                                    // User has completed everything - ContentView will show MainTabView
+                                    // Don't set currentStep here - ContentView handles navigation
                                     viewModel.lifeBlueprint = profile.lifeBlueprint
-                                    viewModel.currentStep = .blueprint
+                                    print("✅ ContentView: User has blueprint, will show MainTabView")
                                 } else if !profile.values.isEmpty {
                                     // User completed questionnaire - determine where they should be
-                                    // CRITICAL: Check subscription status FIRST before deciding to skip payment
-                                    // We need to wait for subscription check to complete
-                                    Task {
-                                        // Wait for subscription status check to complete
-                                        await subscriptionManager.checkSubscriptionStatus()
-                                        await paymentService.refreshPurchasedProducts()
-                                        
-                                        // CRITICAL: Only use SubscriptionManager's hasActiveSubscription
-                                        // It checks BOTH StoreKit AND Supabase
-                                        // Do NOT use paymentService.hasActiveSubscription alone
-                                        let hasActiveSubscription = subscriptionManager.hasActiveSubscription
-                                        
-                                        await MainActor.run {
-                                            if hasActiveSubscription {
-                                                // User has active subscription in BOTH StoreKit AND Supabase
-                                                print("✅✅✅ User has VALID subscription (StoreKit + Supabase), skipping payment and generating blueprint")
-                                                viewModel.hasPaid = true // Mark as paid to allow blueprint generation
-                                                viewModel.generateLifeBlueprint()
-                                                viewModel.currentStep = .loading // Show loading while generating
-                                            } else {
-                                                // User has NO valid subscription - show payment page
-                                                print("❌❌❌ User has NO valid subscription, showing payment page")
-                                                print("   SubscriptionManager.hasActiveSubscription: \(subscriptionManager.hasActiveSubscription)")
-                                                print("   PaymentService.hasActiveSubscription: \(paymentService.hasActiveSubscription)")
-                                                print("   User MUST pay before generating blueprint")
-                                                viewModel.currentStep = .payment
+                                    // Reload consent status (in case user just logged in)
+                                    viewModel.loadAIConsentStatus()
+                                    
+                                    // CRITICAL: Check if user has given AI consent first
+                                    if viewModel.hasGivenAIConsent {
+                                        // User has given consent (from login page), check subscription status
+                                        Task {
+                                            await subscriptionManager.checkSubscriptionStatus()
+                                            await paymentService.refreshPurchasedProducts()
+                                            
+                                            let hasActiveSubscription = subscriptionManager.hasActiveSubscription
+                                            
+                                            await MainActor.run {
+                                                if hasActiveSubscription {
+                                                    print("✅✅✅ User has VALID subscription (StoreKit + Supabase), skipping payment and generating blueprint")
+                                                    viewModel.hasPaid = true
+                                                    viewModel.generateLifeBlueprint()
+                                                    viewModel.currentStep = .loading
+                                                } else {
+                                                    print("❌❌❌ User has NO valid subscription, showing payment page")
+                                                    viewModel.currentStep = .payment
+                                                }
                                             }
                                         }
+                                        viewModel.currentStep = .loading
+                                    } else {
+                                        // User hasn't given consent yet (shouldn't happen if login flow is correct)
+                                        // Fallback: show consent screen
+                                        print("⚠️ User has not given AI consent, showing consent screen")
+                                        viewModel.currentStep = .aiConsent
                                     }
-                                    
-                                    // Set to loading initially while we check subscription
-                                    viewModel.currentStep = .loading
                                 } else if !profile.strengths.isEmpty {
                                     viewModel.currentStep = .values
                                 } else if !profile.interests.isEmpty {
@@ -124,6 +134,12 @@ struct ContentView: View {
                                 } else {
                                     viewModel.currentStep = .basicInfo
                                 }
+                            } else {
+                                // No profile exists - reset to first page (basicInfo)
+                                // This happens when user clears all data
+                                viewModel.resetInitialScan()
+                                viewModel.loadAIConsentStatus() // Reload consent status (should be false after clear)
+                                print("✅ ContentView: No profile found, resetting to initial scan (basicInfo)")
                             }
                         }
                 }

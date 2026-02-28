@@ -4,7 +4,10 @@ struct TaskManagementView: View {
     @EnvironmentObject var dataService: DataService
     @EnvironmentObject var themeManager: ThemeManager
     @State private var selectedTab = 0
-    @State private var isGeneratingActionPlan = false
+    // Use shared state from DataService to sync with DeepeningExplorationView
+    private var isGeneratingActionPlan: Bool {
+        dataService.isGeneratingActionPlan
+    }
     @State private var showFavoriteRequiredAlert = false
     @State private var showActionPlanSuccess = false
     @State private var isGeneratingTodayTasks = false
@@ -13,192 +16,268 @@ struct TaskManagementView: View {
     @State private var showRegenerateConfirmation = false
     @State private var showGenerateTodayTasksConfirmation = false
     @State private var showEmptyTitleAlert = false
+    @State private var errorMessage = ""
+    @State private var showError = false
     
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                Picker("", selection: $selectedTab) {
-                    Text("今日任務").tag(0)
-                    Text("所有任務").tag(1)
+            mainContent
+                .background(BrandColors.background)
+                .navigationTitle("任務管理")
+                .preferredColorScheme(themeManager.isDarkMode ? .dark : .light)
+                .alert("需要選擇最愛方向", isPresented: $showFavoriteRequiredAlert) {
+                    Button("確定", role: .cancel) { }
+                } message: {
+                    Text("請先在生命藍圖編輯頁面選擇一個方向設為最愛，然後再生成行動計劃")
                 }
-                .pickerStyle(.segmented)
-                .padding()
-                .frame(maxWidth: ResponsiveLayout.maxContentWidth())
-                .padding(.horizontal, ResponsiveLayout.horizontalPadding())
-                
-                if let actionPlan = dataService.userProfile?.actionPlan {
-                    ScrollView {
-                        VStack(spacing: BrandSpacing.xxl) {
-                            if selectedTab == 0 {
-                                // Today's Tasks Section
-                                TodayTasksSection(
-                                    items: actionPlan.todayTasks,
-                                    isGenerating: isGeneratingTodayTasks,
-                                    isEditing: $isEditingTodayTasks,
-                                    editedItems: $editedTodayTasks,
-                                    onGenerate: {
-                                        showGenerateTodayTasksConfirmation = true
-                                    },
-                                    onSave: saveTodayTasks
-                                )
-                            } else {
-                                TaskSection(title: "短期目標（1-3個月）", items: actionPlan.shortTerm, sectionType: .shortTerm)
-                                TaskSection(title: "中期目標（3-6個月）", items: actionPlan.midTerm, sectionType: .midTerm)
-                                TaskSection(title: "長期目標（6-12個月）", items: actionPlan.longTerm, sectionType: .longTerm)
-                                
-                                if !actionPlan.milestones.isEmpty {
-                                    EditableMilestonesSection(milestones: actionPlan.milestones)
-                                }
-                                
-                                // Regenerate Action Plan Button
-                                RegenerateActionPlanButton(
-                                    onRegenerate: {
-                                        showRegenerateConfirmation = true
-                                    }
-                                )
-                            }
-                        }
-                        .padding(.vertical)
-                        .frame(maxWidth: ResponsiveLayout.maxContentWidth())
-                        .padding(.horizontal, ResponsiveLayout.horizontalPadding())
+                .alert("成功", isPresented: $showActionPlanSuccess) {
+                    Button("確定", role: .cancel) { }
+                } message: {
+                    Text("行動計劃已生成")
+                }
+                .alert("重新生成行動計劃", isPresented: $showRegenerateConfirmation) {
+                    Button("取消", role: .cancel) { }
+                    Button("確認重新生成", role: .destructive) {
+                        regenerateActionPlan()
                     }
+                } message: {
+                    Text("重新生成行動計劃將會刪除現有的行動計劃。此操作無法復原，確定要繼續嗎？")
+                }
+                .alert("生成今日任務", isPresented: $showGenerateTodayTasksConfirmation) {
+                    Button("取消", role: .cancel) { }
+                    Button("確認生成", role: .destructive) {
+                        generateTodayTasks()
+                    }
+                } message: {
+                    Text("生成新的今日任務將會重置所有現有的今日任務。此操作無法復原，確定要繼續嗎？")
+                }
+                .alert("任務標題不能為空", isPresented: $showEmptyTitleAlert) {
+                    Button("確定", role: .cancel) { }
+                } message: {
+                    Text("請為所有任務輸入標題後再儲存。")
+                }
+                .alert("錯誤", isPresented: $showError) {
+                    Button("確定", role: .cancel) { }
+                } message: {
+                    Text(errorMessage)
+                }
+        }
+    }
+    
+    // MARK: - Main Content
+    private var mainContent: some View {
+        VStack(spacing: 0) {
+            tabPicker
+            
+            if let actionPlan = dataService.userProfile?.actionPlan {
+                actionPlanContent(actionPlan: actionPlan)
+            } else {
+                noActionPlanContent
+            }
+        }
+    }
+    
+    // MARK: - Tab Picker
+    private var tabPicker: some View {
+        Picker("", selection: $selectedTab) {
+            Text("今日任務").tag(0)
+            Text("所有任務").tag(1)
+        }
+        .pickerStyle(.segmented)
+        .padding()
+        .frame(maxWidth: ResponsiveLayout.maxContentWidth())
+        .padding(.horizontal, ResponsiveLayout.horizontalPadding())
+    }
+    
+    // MARK: - Action Plan Content
+    private func actionPlanContent(actionPlan: ActionPlan) -> some View {
+        ScrollView {
+            VStack(spacing: BrandSpacing.xxl) {
+                if selectedTab == 0 {
+                    // Today's Tasks Section
+                    TodayTasksSection(
+                        items: actionPlan.todayTasks,
+                        isGenerating: isGeneratingTodayTasks,
+                        isEditing: $isEditingTodayTasks,
+                        editedItems: $editedTodayTasks,
+                        onGenerate: {
+                            showGenerateTodayTasksConfirmation = true
+                        },
+                        onSave: saveTodayTasks
+                    )
                 } else {
-                    ScrollView {
-                        VStack(spacing: BrandSpacing.xl) {
-                            // Guidance message
-                            VStack(spacing: BrandSpacing.md) {
-                                Image(systemName: "checklist")
-                                    .font(.system(size: 60))
-                                    .foregroundColor(BrandColors.secondaryText)
-                                Text("尚未生成行動計劃")
-                                    .font(BrandTypography.headline)
-                                    .foregroundColor(BrandColors.primaryText)
-                                
-                                if isDeepeningExplorationComplete() {
-                                    VStack(spacing: BrandSpacing.sm) {
-                                        Text("您已完成深化探索！")
-                                            .font(BrandTypography.subheadline)
-                                            .foregroundColor(BrandColors.primaryText)
-                                        
-                                        // Check if user has selected a favorite direction
-                                        if let blueprint = dataService.userProfile?.lifeBlueprint,
-                                           blueprint.vocationDirections.contains(where: { $0.isFavorite }) {
-                                            Button(action: {
-                                                generateActionPlan()
-                                            }) {
-                                                HStack(spacing: BrandSpacing.sm) {
-                                                    if isGeneratingActionPlan {
-                                                        ProgressView()
-                                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                                            .scaleEffect(0.8)
-                                                    } else {
-                                                        Image(systemName: "sparkles")
-                                                    }
-                                                    Text(isGeneratingActionPlan ? "正在生成..." : "生成行動計劃")
-                                                }
-                                                .font(BrandTypography.headline)
-                                                .fontWeight(.bold)
-                                                .foregroundColor(BrandColors.invertedText) // Black text on white button
-                                                .frame(maxWidth: .infinity)
-                                                .frame(height: 50)
-                                                .background(BrandColors.primaryText) // White background
-                                                .clipShape(Capsule()) // Pill shape
-                                            }
-                                            .buttonStyle(.plain)
-                                            .disabled(isGeneratingActionPlan)
-                                        } else {
-                                            VStack(spacing: BrandSpacing.sm) {
-                                                Text("請先在生命藍圖編輯頁面選擇一個方向設為最愛")
-                                                    .font(BrandTypography.subheadline)
-                                                    .foregroundColor(BrandColors.secondaryText)
-                                                    .multilineTextAlignment(.center)
-                                                
-                                                if let blueprint = dataService.userProfile?.lifeBlueprint {
-                                                    NavigationLink(destination: LifeBlueprintEditView(blueprint: blueprint)) {
-                                                        HStack(spacing: BrandSpacing.sm) {
-                                                            Image(systemName: "pencil")
-                                                            Text("編輯生命藍圖")
-                                                        }
-                                                        .font(BrandTypography.headline)
-                                                        .fontWeight(.bold)
-                                                        .foregroundColor(BrandColors.invertedText) // Black text on white button
-                                                        .frame(maxWidth: .infinity)
-                                                        .frame(height: 50)
-                                                        .background(BrandColors.primaryText) // White background
-                                                        .clipShape(Capsule()) // Pill shape
-                                                        .cornerRadius(BrandRadius.medium)
-                                                    }
-                                                    .buttonStyle(.plain)
-                                                }
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    VStack(spacing: BrandSpacing.sm) {
-                                        Text("請先完成深化探索，然後AI將為您生成個人化行動計劃")
-                                            .font(BrandTypography.subheadline)
-                                            .foregroundColor(BrandColors.secondaryText)
-                                            .multilineTextAlignment(.center)
-                                        
-                                        NavigationLink(destination: DeepeningExplorationView()) {
-                                            HStack(spacing: BrandSpacing.sm) {
-                                                Image(systemName: "chart.line.uptrend.xyaxis")
-                                                    .font(.system(size: 16, weight: .bold))
-                                                Text("前往深化探索")
-                                                    .font(BrandTypography.headline)
-                                                    .fontWeight(.bold)
-                                            }
-                                            .foregroundColor(BrandColors.invertedText) // Black text on white button
-                                            .frame(maxWidth: .infinity)
-                                            .frame(height: 50)
-                                            .background(BrandColors.primaryText) // White background
-                                            .clipShape(Capsule()) // Pill shape
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
-                                }
-                            }
-                            .padding(BrandSpacing.xl)
-                            .frame(maxWidth: .infinity)
-                        }
-                        .padding(.vertical, BrandSpacing.xl)
+                    allTasksContent(actionPlan: actionPlan)
+                }
+            }
+            .padding(.vertical)
+            .frame(maxWidth: ResponsiveLayout.maxContentWidth())
+            .padding(.horizontal, ResponsiveLayout.horizontalPadding())
+        }
+    }
+    
+    // MARK: - All Tasks Content
+    private func allTasksContent(actionPlan: ActionPlan) -> some View {
+        VStack(spacing: BrandSpacing.xxl) {
+            TaskSection(title: "短期目標（1-3個月）", items: actionPlan.shortTerm, sectionType: .shortTerm)
+            TaskSection(title: "中期目標（3-6個月）", items: actionPlan.midTerm, sectionType: .midTerm)
+            TaskSection(title: "長期目標（6-12個月）", items: actionPlan.longTerm, sectionType: .longTerm)
+            
+            if !actionPlan.milestones.isEmpty {
+                EditableMilestonesSection(milestones: actionPlan.milestones)
+            }
+            
+            // Regenerate Action Plan Button
+            RegenerateActionPlanButton(
+                onRegenerate: {
+                    showRegenerateConfirmation = true
+                }
+            )
+        }
+    }
+    
+    // MARK: - No Action Plan Content
+    private var noActionPlanContent: some View {
+        ScrollView {
+            VStack(spacing: BrandSpacing.xl) {
+                if isGeneratingActionPlan {
+                    generatingStatusView
+                } else {
+                    guidanceMessageView
+                }
+            }
+            .padding(.vertical, BrandSpacing.xl)
+        }
+    }
+    
+    // MARK: - Generating Status View
+    private var generatingStatusView: some View {
+        VStack(spacing: BrandSpacing.lg) {
+            ProgressView()
+                .progressViewStyle(CircularProgressViewStyle(tint: BrandColors.actionAccent))
+                .scaleEffect(1.2)
+            
+            Text("行動計劃生成中")
+                .font(BrandTypography.title2)
+                .fontWeight(.semibold)
+                .foregroundColor(BrandColors.primaryText)
+            
+            Text("AI正在為您生成個人化行動計劃，請稍候...")
+                .font(BrandTypography.body)
+                .foregroundColor(BrandColors.secondaryText)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, BrandSpacing.xl)
+        }
+        .padding(BrandSpacing.xxl)
+        .frame(maxWidth: ResponsiveLayout.maxContentWidth())
+        .frame(maxHeight: .infinity)
+        .padding(BrandSpacing.xl)
+    }
+    
+    // MARK: - Guidance Message View
+    private var guidanceMessageView: some View {
+        VStack(spacing: BrandSpacing.md) {
+            Image(systemName: "checklist")
+                .font(.system(size: 60))
+                .foregroundColor(BrandColors.secondaryText)
+            Text("尚未生成行動計劃")
+                .font(BrandTypography.headline)
+                .foregroundColor(BrandColors.primaryText)
+            
+            if isDeepeningExplorationComplete() {
+                deepeningExplorationCompleteContent
+            } else {
+                deepeningExplorationIncompleteContent
+            }
+        }
+        .padding(BrandSpacing.xl)
+        .frame(maxWidth: ResponsiveLayout.maxContentWidth())
+        .frame(maxHeight: .infinity)
+    }
+    
+    // MARK: - Deepening Exploration Complete Content
+    private var deepeningExplorationCompleteContent: some View {
+        VStack(spacing: BrandSpacing.sm) {
+            Text("您已完成深化探索！")
+                .font(BrandTypography.subheadline)
+                .foregroundColor(BrandColors.primaryText)
+            
+            if let blueprint = dataService.userProfile?.lifeBlueprint,
+               blueprint.vocationDirections.contains(where: { $0.isFavorite }),
+               dataService.userProfile?.actionPlan == nil {
+                Button(action: {
+                    generateActionPlan()
+                }) {
+                    HStack(spacing: BrandSpacing.sm) {
+                        Image(systemName: "sparkles")
+                        Text("生成行動計劃")
                     }
+                    .font(BrandTypography.headline)
+                    .fontWeight(.bold)
+                    .foregroundColor(BrandColors.invertedText)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                    .background(BrandColors.actionAccent)
+                    .clipShape(Capsule())
                 }
+                .buttonStyle(.plain)
+                .disabled(dataService.userProfile?.actionPlan != nil)
+            } else {
+                favoriteDirectionRequiredContent
             }
-            .background(BrandColors.background)
-            .navigationTitle("任務管理")
-            .preferredColorScheme(themeManager.isDarkMode ? .dark : .light)
-            .alert("需要選擇最愛方向", isPresented: $showFavoriteRequiredAlert) {
-                Button("確定", role: .cancel) { }
-            } message: {
-                Text("請先在生命藍圖編輯頁面選擇一個方向設為最愛，然後再生成行動計劃")
-            }
-            .alert("成功", isPresented: $showActionPlanSuccess) {
-                Button("確定", role: .cancel) { }
-            } message: {
-                Text("行動計劃已生成")
-            }
-            .alert("重新生成行動計劃", isPresented: $showRegenerateConfirmation) {
-                Button("取消", role: .cancel) { }
-                Button("確認重新生成", role: .destructive) {
-                    regenerateActionPlan()
+        }
+    }
+    
+    // MARK: - Favorite Direction Required Content
+    private var favoriteDirectionRequiredContent: some View {
+        VStack(spacing: BrandSpacing.sm) {
+            Text("請先在生命藍圖編輯頁面選擇一個方向設為最愛")
+                .font(BrandTypography.subheadline)
+                .foregroundColor(BrandColors.secondaryText)
+                .multilineTextAlignment(.center)
+            
+            if let blueprint = dataService.userProfile?.lifeBlueprint {
+                NavigationLink(destination: LifeBlueprintEditView(blueprint: blueprint)) {
+                    HStack(spacing: BrandSpacing.sm) {
+                        Image(systemName: "pencil")
+                        Text("編輯生命藍圖")
+                    }
+                    .font(BrandTypography.headline)
+                    .fontWeight(.bold)
+                    .foregroundColor(BrandColors.invertedText)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                    .background(BrandColors.primaryText)
+                    .clipShape(Capsule())
+                    .cornerRadius(BrandRadius.medium)
                 }
-            } message: {
-                Text("重新生成行動計劃將會刪除現有的行動計劃。此操作無法復原，確定要繼續嗎？")
+                .buttonStyle(.plain)
             }
-            .alert("生成今日任務", isPresented: $showGenerateTodayTasksConfirmation) {
-                Button("取消", role: .cancel) { }
-                Button("確認生成", role: .destructive) {
-                    generateTodayTasks()
+        }
+    }
+    
+    // MARK: - Deepening Exploration Incomplete Content
+    private var deepeningExplorationIncompleteContent: some View {
+        VStack(spacing: BrandSpacing.sm) {
+            Text("請先完成深化探索，然後AI將為您生成個人化行動計劃")
+                .font(BrandTypography.subheadline)
+                .foregroundColor(BrandColors.secondaryText)
+                .multilineTextAlignment(.center)
+            
+            NavigationLink(destination: DeepeningExplorationView()) {
+                HStack(spacing: BrandSpacing.sm) {
+                    Image(systemName: "chart.line.uptrend.xyaxis")
+                        .font(.system(size: 16, weight: .bold))
+                    Text("前往深化探索")
+                        .font(BrandTypography.headline)
+                        .fontWeight(.bold)
                 }
-            } message: {
-                Text("生成新的今日任務將會重置所有現有的今日任務。此操作無法復原，確定要繼續嗎？")
+                .foregroundColor(BrandColors.invertedText)
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+                .background(BrandColors.actionAccent)
+                .clipShape(Capsule())
             }
-            .alert("任務標題不能為空", isPresented: $showEmptyTitleAlert) {
-                Button("確定", role: .cancel) { }
-            } message: {
-                Text("請為所有任務輸入標題後再儲存。")
-            }
+            .buttonStyle(.plain)
         }
     }
     
@@ -276,23 +355,54 @@ struct TaskManagementView: View {
             return
         }
         
-        guard !isGeneratingActionPlan else { return }
-        isGeneratingActionPlan = true
+        guard !dataService.isGeneratingActionPlan else { return }
+        // CRITICAL: Set shared state so both pages know generation is in progress
+        dataService.isGeneratingActionPlan = true
         
-        Task {
+        // CRITICAL: Request background task to allow generation to continue even if app goes to background
+        var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
+        backgroundTaskID = UIApplication.shared.beginBackgroundTask(withName: "GenerateActionPlan") {
+            // Task expired, end it
+            if backgroundTaskID != .invalid {
+                UIApplication.shared.endBackgroundTask(backgroundTaskID)
+                backgroundTaskID = .invalid
+            }
+        }
+        
+        // Store backgroundTaskID in a way that can be accessed from detached task
+        let taskID = backgroundTaskID
+        
+        // CRITICAL: Use detached task to prevent cancellation when view disappears
+        // This ensures generation continues even when user switches screens
+        Task.detached(priority: .userInitiated) {
             do {
                 let plan = try await AIService.shared.generateActionPlan(profile: profile, favoriteDirection: favoriteDirection)
                 await MainActor.run {
                     DataService.shared.updateUserProfile { profile in
                         profile.actionPlan = plan
                     }
-                    isGeneratingActionPlan = false
+                    // CRITICAL: Set shared state to false AFTER saving action plan
+                    // This ensures button disappears immediately in both pages
+                    dataService.isGeneratingActionPlan = false
                     showActionPlanSuccess = true
+                    
+                    // End background task
+                    if taskID != .invalid {
+                        UIApplication.shared.endBackgroundTask(taskID)
+                    }
                 }
             } catch {
                 await MainActor.run {
-                    isGeneratingActionPlan = false
-                    print("Failed to generate action plan: \(error)")
+                    // CRITICAL: Set shared state to false on error too
+                    dataService.isGeneratingActionPlan = false
+                    print("❌ Failed to generate action plan: \(error)")
+                    errorMessage = error.localizedDescription
+                    showError = true
+                    
+                    // End background task
+                    if taskID != .invalid {
+                        UIApplication.shared.endBackgroundTask(taskID)
+                    }
                 }
             }
         }

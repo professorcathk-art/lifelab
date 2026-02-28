@@ -213,9 +213,9 @@ struct PaymentView: View {
                 .padding(.horizontal, ResponsiveLayout.horizontalPadding())
                 .frame(maxWidth: ResponsiveLayout.maxContentWidth())
                 .onAppear {
-                    // Load products when view appears
+                    // Load products when view appears with retry mechanism
                     Task {
-                        await paymentService.loadProducts()
+                        await loadProductsWithRetry()
                     }
                 }
                 .onChange(of: paymentService.products) { products in
@@ -227,6 +227,11 @@ struct PaymentView: View {
                 
                 // CTA Button - "開啟我的理想人生"
                 Button(action: {
+                    // CRITICAL: Immediately set processing state to prevent double-click
+                    guard !isProcessing && !viewModel.isLoadingBlueprint && !paymentService.isLoading else {
+                        return
+                    }
+                    isProcessing = true
                     Task {
                         await handlePurchase()
                     }
@@ -243,7 +248,7 @@ struct PaymentView: View {
                             .font(BrandTypography.headline)
                             .fontWeight(.bold)
                     }
-                    .foregroundColor(BrandColors.invertedText)
+                    .foregroundColor(Color.white) // CRITICAL: White text on purple background for proper contrast
                     .frame(maxWidth: .infinity)
                     .frame(height: 50)
                     .background(BrandColors.actionAccent) // Purple background
@@ -288,18 +293,26 @@ struct PaymentView: View {
             .frame(maxWidth: .infinity)
         }
         .background(BrandColors.background)
-        .alert("購買成功", isPresented: $showSuccess) {
-            Button("確定") {
-                hasCompletedPurchase = true // Mark purchase as completed
-                viewModel.completePayment()
+        // REMOVED: Success alert - now we navigate immediately to loading page
+        // This prevents users from being stuck on payment page while AI generates
+        // .alert("購買成功", isPresented: $showSuccess) {
+        //     Button("確定") {
+        //         hasCompletedPurchase = true
+        //         viewModel.completePayment()
+        //     }
+        // } message: {
+        //     Text("訂閱成功！正在為您生成生命藍圖...")
+        // }
+        .alert("", isPresented: $showError) {
+            Button("確定", role: .cancel) { }
+            Button("重試") {
+                Task {
+                    await handlePurchase()
+                }
             }
         } message: {
-            Text("訂閱成功！正在為您生成生命藍圖...")
-        }
-        .alert("購買失敗", isPresented: $showError) {
-            Button("確定", role: .cancel) { }
-        } message: {
-            Text(paymentService.errorMessage ?? "未知錯誤")
+            Text(paymentService.errorMessage ?? "購買過程中發生錯誤。\n\n請稍後再試，如問題持續存在，請聯繫客服。")
+                .font(BrandTypography.body)
         }
         .onChange(of: viewModel.isLoadingBlueprint) { isLoading in
             if isLoading {
@@ -344,10 +357,13 @@ struct PaymentView: View {
                         // User has valid subscription in BOTH StoreKit AND Supabase
                         hasCompletedPurchase = true
                         
-                        // If user has active subscription but no blueprint, auto-generate
+                        // If user has active subscription but no blueprint, redirect to loading page with progress bar
                         if dataService.userProfile?.lifeBlueprint == nil {
-                            print("✅✅✅ PaymentView: User has VALID subscription (StoreKit + Supabase), auto-generating blueprint")
+                            print("✅✅✅ PaymentView: User has VALID subscription (StoreKit + Supabase), redirecting to loading page with progress bar")
                             viewModel.hasPaid = true // Mark as paid to allow blueprint generation
+                            // CRITICAL: Redirect to loading page immediately so user sees progress bar
+                            viewModel.currentStep = .loading
+                            // Start blueprint generation (will show progress bar on loading page)
                             viewModel.generateLifeBlueprint()
                         }
                     } else {
@@ -373,27 +389,69 @@ struct PaymentView: View {
         }
     }
     
+    // CRITICAL: Load products with retry mechanism for Apple review
+    // Products may not be immediately available in sandbox environment
+    private func loadProductsWithRetry(maxRetries: Int = 3) async {
+        for attempt in 1...maxRetries {
+            print("🔄 Loading products (attempt \(attempt)/\(maxRetries))...")
+            await paymentService.loadProducts()
+            
+            if !paymentService.products.isEmpty {
+                print("✅ Products loaded successfully: \(paymentService.products.map { $0.id })")
+                return
+            }
+            
+            if attempt < maxRetries {
+                print("⏳ Waiting 2 seconds before retry...")
+                try? await Task.sleep(nanoseconds: 2_000_000_000) // Wait 2 seconds
+            }
+        }
+        
+        // All retries failed
+        print("❌ Failed to load products after \(maxRetries) attempts")
+        if paymentService.products.isEmpty {
+            await MainActor.run {
+                paymentService.errorMessage = "無法載入產品，請稍後再試"
+            }
+        }
+    }
+    
     private func handlePurchase() async {
-        isProcessing = true
+        // Note: isProcessing is already set in button action to prevent double-click
         showWaitingTime = true
         
-        // Get the product for yearly subscription
-        let productID = selectedPackage.productID // "com.resonance.lifelab.yearly"
+        // Get the product ID for selected package
+        let productID = selectedPackage.productID
         
-        // Ensure products are loaded
+        // CRITICAL: Ensure products are loaded with retry mechanism
+        // This is important for Apple review where products may not be immediately available
         if paymentService.products.isEmpty {
-            print("📦 Products not loaded yet, loading now...")
+            print("📦 Products not loaded yet, loading with retry...")
+            await loadProductsWithRetry()
+        }
+        
+        // If still empty after retry, try one more time with delay
+        if paymentService.products.isEmpty {
+            print("⚠️ Products still empty after retry, trying once more...")
             await paymentService.loadProducts()
+            // Wait a bit for StoreKit to sync
+            try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
         }
         
         // Find the product
         guard let product = paymentService.products.first(where: { $0.id == productID }) else {
             print("❌ Product not found: \(productID)")
             print("📦 Available products: \(paymentService.products.map { $0.id })")
+            print("📦 Expected product IDs:")
+            print("   - com.resonance.lifelab.annually")
+            print("   - com.resonance.lifelab.quarterly")
+            print("   - com.resonance.lifelab.monthly")
+            
             await MainActor.run {
                 isProcessing = false
                 showWaitingTime = false
-                paymentService.errorMessage = "無法載入產品，請稍後再試"
+                // Provide more helpful error message
+                paymentService.errorMessage = "無法載入產品。請確保：\n1. 網絡連接正常\n2. App Store 服務可用\n3. 稍後再試"
                 showError = true
             }
             return
@@ -410,8 +468,16 @@ struct PaymentView: View {
                 
                 if success {
                     print("✅ Purchase successful!")
-                    // Show success alert, which will trigger completePayment()
-                    showSuccess = true
+                    // CRITICAL: Immediately navigate to loading page and start AI generation in background
+                    // Don't wait for AI to finish - let it run in background
+                    // Mark as paid immediately
+                    viewModel.hasPaid = true
+                    // Navigate to loading page immediately
+                    viewModel.currentStep = .loading
+                    // Start AI generation in background (non-blocking)
+                    viewModel.generateLifeBlueprint()
+                    // Don't show success alert - user is already on loading page
+                    // showSuccess = true
                 } else {
                     // User cancelled or purchase pending
                     showWaitingTime = false
@@ -571,7 +637,7 @@ struct PackageCard: View {
                             .font(BrandTypography.caption)
                             .fontWeight(.bold)
                     }
-                    .foregroundColor(BrandColors.invertedText) // White text
+                    .foregroundColor(Color.white) // CRITICAL: White text on purple background for proper contrast
                     .padding(.horizontal, BrandSpacing.sm)
                     .padding(.vertical, BrandSpacing.xs)
                     .background(BrandColors.actionAccent) // Purple background

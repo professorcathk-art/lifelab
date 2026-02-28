@@ -47,7 +47,9 @@ class SubscriptionManager: ObservableObject {
         let hasStoreKitSubscription = paymentService.hasActiveSubscription
         
         // CRITICAL: Check Supabase - this is REQUIRED
+        // BUT: If network fails, fall back to StoreKit only (for better UX)
         var supabaseSubscription: UserSubscription?
+        var supabaseCheckFailed = false
         if let userId = AuthService.shared.currentUser?.id {
             do {
                 supabaseSubscription = try await supabaseService.fetchUserSubscription(userId: userId)
@@ -61,55 +63,84 @@ class SubscriptionManager: ObservableObject {
                     print("   Supabase subscription table is empty or no active subscription")
                 }
             } catch {
-                print("❌❌❌ Failed to fetch subscription from Supabase: \(error.localizedDescription)")
-                print("   This means NO subscription in Supabase")
-                supabaseSubscription = nil
+                // Check if this is a network error
+                let nsError = error as NSError
+                if nsError.domain == NSURLErrorDomain {
+                    // Network error - Use StoreKit as fallback for better UX
+                    // This allows users with valid StoreKit subscriptions to continue using the app
+                    // even when network is temporarily unavailable
+                    print("⚠️⚠️⚠️ Network error checking Supabase subscription")
+                    print("   Error: \(error.localizedDescription)")
+                    print("   Error code: \(nsError.code)")
+                    print("   ⚠️ Using StoreKit as fallback for better user experience")
+                    print("   ⚠️ User with StoreKit subscription can continue using app")
+                    supabaseCheckFailed = true
+                } else {
+                    // Other error (e.g., authentication, not found)
+                    print("❌❌❌ Failed to fetch subscription from Supabase: \(error.localizedDescription)")
+                    print("   This means NO subscription in Supabase")
+                    supabaseSubscription = nil
+                }
             }
         }
         
-        // CRITICAL: User must have subscription in BOTH StoreKit AND Supabase
-        // If Supabase has no record, user MUST pay, even if StoreKit shows active
-        if hasStoreKitSubscription && supabaseSubscription != nil {
-            // User has active subscription in BOTH StoreKit AND Supabase
-            let subscription = supabaseSubscription!
+        // CRITICAL: StoreKit is the AUTHORITATIVE source for subscription status
+        // Apple's StoreKit automatically handles subscription expiration - if StoreKit shows active, it IS active
+        // Supabase is only for syncing and record-keeping, NOT for access control
+        
+        // PRIORITY 1: If StoreKit shows active subscription, ALWAYS allow access
+        // This prevents false blocking due to:
+        // - Supabase sync delays after purchase
+        // - Supabase database issues
+        // - Network errors checking Supabase
+        if hasStoreKitSubscription {
+            // StoreKit shows active subscription - this is authoritative
+            hasActiveSubscription = true
             
-            // Check if subscription is still active (not expired)
-            if subscription.status == .active && subscription.endDate > Date() {
-                hasActiveSubscription = true
+            // Try to get expiry date from Supabase if available
+            if let subscription = supabaseSubscription {
                 subscriptionExpiryDate = subscription.endDate
                 currentPlanType = subscription.planType
-                print("✅✅✅ VALID SUBSCRIPTION FOUND ✅✅✅")
-                print("   StoreKit: ✅ Active")
+                print("✅✅✅ VALID SUBSCRIPTION (StoreKit + Supabase) ✅✅✅")
+                print("   StoreKit: ✅ Active (AUTHORITATIVE)")
                 print("   Supabase: ✅ Active")
                 print("   Plan: \(subscription.planType.rawValue)")
                 print("   End Date: \(subscription.endDate)")
             } else {
-                // Subscription expired in Supabase
-                hasActiveSubscription = false
-                subscriptionExpiryDate = subscription.endDate
-                currentPlanType = subscription.planType
-                print("❌❌❌ SUBSCRIPTION EXPIRED IN SUPABASE ❌❌❌")
-                print("   StoreKit: ✅ Active")
-                print("   Supabase: ❌ Expired (endDate: \(subscription.endDate))")
-                print("   User MUST pay to renew")
+                // StoreKit active but no Supabase record - still allow access
+                // This can happen if:
+                // - User just purchased (Supabase not synced yet)
+                // - User restored purchases (Supabase not synced)
+                // - Supabase database issue
+                subscriptionExpiryDate = nil
+                currentPlanType = nil
+                if supabaseCheckFailed {
+                    print("⚠️⚠️⚠️ STOREKIT ACTIVE - SUPABASE NETWORK ERROR ⚠️⚠️⚠️")
+                    print("   StoreKit: ✅ Active (AUTHORITATIVE)")
+                    print("   Supabase: ⚠️ Network error")
+                    print("   ✅ User access granted based on StoreKit (Apple's authority)")
+                } else {
+                    print("⚠️⚠️⚠️ STOREKIT ACTIVE - NO SUPABASE RECORD ⚠️⚠️⚠️")
+                    print("   StoreKit: ✅ Active (AUTHORITATIVE)")
+                    print("   Supabase: ❌ No record (may be sync delay)")
+                    print("   ✅ User access granted based on StoreKit (Apple's authority)")
+                    print("   ℹ️ Supabase record will be created on next purchase or sync")
+                }
             }
         } else {
-            // User does NOT have subscription in BOTH places
+            // StoreKit shows NO active subscription
+            // This is the ONLY case where we deny access
             hasActiveSubscription = false
             subscriptionExpiryDate = nil
             currentPlanType = nil
             
-            if hasStoreKitSubscription && supabaseSubscription == nil {
-                print("❌❌❌ STOREKIT HAS SUBSCRIPTION BUT SUPABASE DOES NOT ❌❌❌")
-                print("   StoreKit: ✅ Active")
-                print("   Supabase: ❌ NO RECORD")
-                print("   ⚠️ CRITICAL: User MUST pay - Supabase subscription table is empty")
-                print("   This means subscription was not properly saved to Supabase")
-            } else if !hasStoreKitSubscription && supabaseSubscription != nil {
-                print("❌❌❌ SUPABASE HAS SUBSCRIPTION BUT STOREKIT DOES NOT ❌❌❌")
-                print("   StoreKit: ❌ No subscription")
-                print("   Supabase: ✅ Has record")
-                print("   ⚠️ CRITICAL: User MUST pay - StoreKit subscription not found")
+            if supabaseSubscription != nil {
+                // Supabase has record but StoreKit doesn't - StoreKit is authoritative
+                print("❌❌❌ NO STOREKIT SUBSCRIPTION (AUTHORITATIVE) ❌❌❌")
+                print("   StoreKit: ❌ No subscription (AUTHORITATIVE)")
+                print("   Supabase: ✅ Has record (but StoreKit is authoritative)")
+                print("   ⚠️ Access denied - StoreKit shows no active subscription")
+                print("   ℹ️ User must purchase or restore purchases")
             } else {
                 print("❌❌❌ NO SUBSCRIPTION FOUND ❌❌❌")
                 print("   StoreKit: ❌ No subscription")

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct StrengthsQuestionnaireView: View {
     @EnvironmentObject var viewModel: InitialScanViewModel
+    @StateObject private var themeManager = ThemeManager.shared
     @State private var currentQuestionIndex = 0
     @FocusState private var isAnswerFocused: Bool
     
@@ -344,13 +345,19 @@ struct StrengthsQuestionnaireView: View {
                                 Image(systemName: "arrow.right")
                                     .font(.system(size: 16, weight: .bold))
                             }
-                            .foregroundColor(BrandColors.invertedText)
+                            .foregroundColor(
+                                // CRITICAL: Ensure proper contrast
+                                // Dark mode: White background → Black text
+                                // Light mode: Purple background → White text
+                                themeManager.isDarkMode ? Color.black : Color.white
+                            )
                             .frame(height: 50)
                             .padding(.horizontal, BrandSpacing.xl)
                             .background(
-                                ThemeManager.shared.isDarkMode 
-                                    ? BrandColors.primaryText
-                                    : BrandColors.actionAccent
+                                // CRITICAL: Ensure proper contrast
+                                // Dark mode: White background
+                                // Light mode: Purple background
+                                themeManager.isDarkMode ? Color.white : BrandColors.actionAccent
                             )
                             .clipShape(Capsule())
                             .shadow(
@@ -369,7 +376,7 @@ struct StrengthsQuestionnaireView: View {
                 }
             }
         }
-        .preferredColorScheme(ThemeManager.shared.isDarkMode ? .dark : .light)
+        .preferredColorScheme(themeManager.isDarkMode ? .dark : .light)
     }
 }
 
@@ -448,7 +455,7 @@ struct SelectedKeywordChip: View {
             Image(systemName: "checkmark.circle.fill")
                 .font(.caption2)
         }
-        .foregroundColor(BrandColors.invertedText) // White text (was primaryText, but invertedText ensures white in both themes)
+        .foregroundColor(Color.white) // CRITICAL: White text on purple background for proper contrast
         .padding(.horizontal, BrandSpacing.md)
         .padding(.vertical, BrandSpacing.xs)
         .background(BrandColors.actionAccent) // Purple background (selected state)

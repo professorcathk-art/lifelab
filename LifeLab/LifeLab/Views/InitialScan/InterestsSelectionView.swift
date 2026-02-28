@@ -2,6 +2,7 @@ import SwiftUI
 
 struct InterestsSelectionView: View {
     @EnvironmentObject var viewModel: InitialScanViewModel
+    @StateObject private var themeManager = ThemeManager.shared
     @State private var hasStarted = false
     
     var body: some View {
@@ -16,7 +17,7 @@ struct InterestsSelectionView: View {
                 keywordsSelectionScreen
             }
         }
-        .preferredColorScheme(ThemeManager.shared.isDarkMode ? .dark : .light)
+        .preferredColorScheme(themeManager.isDarkMode ? .dark : .light)
     }
     
     // MARK: - Welcome Screen
@@ -135,10 +136,20 @@ struct InterestsSelectionView: View {
                         Image(systemName: "play.fill")
                             .font(.system(size: 16, weight: .bold))
                     }
-                    .foregroundColor(BrandColors.invertedText) // Black text
+                    .foregroundColor(
+                        // CRITICAL: Ensure proper contrast
+                        // Dark mode: White background → Black text
+                        // Light mode: Dark charcoal background → White text
+                        themeManager.isDarkMode ? Color.black : Color.white
+                    )
                     .frame(maxWidth: .infinity)
                     .frame(height: 50) // Fixed height
-                    .background(BrandColors.primaryText) // White background
+                    .background(
+                        // CRITICAL: Ensure proper contrast
+                        // Dark mode: White background
+                        // Light mode: Dark charcoal background
+                        themeManager.isDarkMode ? Color.white : BrandColors.primaryText
+                    )
                     .clipShape(Capsule()) // Pill shape
                 }
                 .buttonStyle(.plain)
@@ -270,10 +281,20 @@ struct InterestsSelectionView: View {
                                     Image(systemName: "checkmark.circle.fill")
                                         .font(.system(size: 16, weight: .bold))
                                 }
-                                .foregroundColor(BrandColors.invertedText) // Black text
+                                .foregroundColor(
+                                    // CRITICAL: Ensure proper contrast
+                                    // Dark mode: White background → Black text
+                                    // Light mode: Dark charcoal background → White text
+                                    themeManager.isDarkMode ? Color.black : Color.white
+                                )
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 50)
-                                .background(BrandColors.primaryText) // White background
+                                .background(
+                                    // CRITICAL: Ensure proper contrast
+                                    // Dark mode: White background
+                                    // Light mode: Dark charcoal background
+                                    themeManager.isDarkMode ? Color.white : BrandColors.primaryText
+                                )
                                 .clipShape(Capsule()) // Pill shape
                             }
                             .buttonStyle(.plain)

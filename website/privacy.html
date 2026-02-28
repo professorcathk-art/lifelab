@@ -207,7 +207,7 @@
         <ul>
             <li>我們不會收集您的姓名、電話號碼或設備識別碼</li>
             <li>基本資料和深化探索資料為可選填寫，您可以選擇不提供</li>
-            <li>我們僅在您明確同意後才會將資料發送給第三方 AI 服務</li>
+            <li><strong>AI 服務資料共享</strong>：我們僅在您明確同意（通過勾選同意框並點擊「我同意並繼續」按鈕）後，才會將您的問卷資料發送給第三方 AI 服務。在您同意之前，我們不會發送任何資料給 AI 服務。</li>
         </ul>
         
         <h2>2. 資料使用</h2>
@@ -221,9 +221,21 @@
         </ul>
         <p><strong>AI 服務使用</strong>：</p>
         <ul>
-            <li>我們僅在您點擊「開啟我的理想人生」按鈕（明確同意）後，才會將您提供的資料發送給第三方 AI 服務（AIML API / Anthropic Claude）</li>
-            <li>發送給 AI 服務的資料不包含任何個人識別資訊（如姓名、電子郵件、電話號碼）</li>
-            <li>AI 服務提供商不會將您的資料用於訓練 AI 模型</li>
+            <li><strong>明確同意機制</strong>：我們會在發送任何資料給第三方 AI 服務之前，向您顯示明確的同意畫面。您必須勾選同意框並點擊「我同意並繼續」按鈕，我們才會將您的資料發送給 AI 服務。在您明確同意之前，我們不會發送任何資料。</li>
+            <li><strong>發送的資料</strong>：我們會將以下資料發送給第三方 AI 服務（AIML API / Anthropic Claude Sonnet 4.5）：
+                <ul>
+                    <li>興趣關鍵詞</li>
+                    <li>天賦問卷回答與關鍵詞</li>
+                    <li>價值觀排序與回答</li>
+                    <li>基本資料（如已填寫：地區、年齡、職業、年薪、家庭狀況、教育程度）</li>
+                    <li>深化探索資料（如已填寫：心流日記、價值觀反思、資源盤點、後天強項、可行性評估）</li>
+                </ul>
+            </li>
+            <li><strong>不發送的資料</strong>：發送給 AI 服務的資料不包含任何個人識別資訊（如姓名、電子郵件、電話號碼、設備識別碼）</li>
+            <li><strong>資料接收方</strong>：您的資料將發送給 AIML API / Anthropic Claude Sonnet 4.5（Anthropic 公司提供的 AI 服務）</li>
+            <li><strong>使用目的</strong>：您的資料僅用於生成個人化的 AI 分析總結、生命藍圖與職涯建議、以及行動計劃建議</li>
+            <li><strong>AI 服務提供商政策</strong>：AI 服務提供商（Anthropic）不會將您的資料用於訓練 AI 模型（根據 AIML API 的隱私政策）</li>
+            <li><strong>資料保護</strong>：所有資料傳輸均使用 HTTPS 加密</li>
         </ul>
         
         <h2>3. 資料儲存</h2>
@@ -256,7 +268,17 @@
         <p>我們使用以下第三方服務：</p>
         <ul>
             <li><strong>Supabase</strong>：用於資料儲存與認證服務。Supabase 遵循嚴格的資料安全標準，並採用 Row Level Security (RLS) 確保只有您本人可以存取您的資料。</li>
-            <li><strong>AI 服務（AIML API / Anthropic Claude Sonnet 4.5）</strong>：用於生成個人化生命藍圖與職涯建議。我們僅在您明確同意（點擊「開啟我的理想人生」按鈕）後，才會將您提供的資料發送給 AI 服務。我們不會發送任何個人識別資訊（如姓名、電子郵件、電話號碼）給 AI 服務。所有資料傳輸均使用 HTTPS 加密。</li>
+            <li><strong>AI 服務（AIML API / Anthropic Claude Sonnet 4.5）</strong>：
+                <ul>
+                    <li><strong>服務提供商</strong>：Anthropic 公司（AIML API / Anthropic Claude Sonnet 4.5）</li>
+                    <li><strong>使用目的</strong>：用於生成個人化生命藍圖與職涯建議</li>
+                    <li><strong>明確同意機制</strong>：我們會在發送任何資料之前，向您顯示明確的同意畫面，說明將發送的資料、接收方和使用目的。您必須勾選同意框並點擊「我同意並繼續」按鈕，我們才會將您的資料發送給 AI 服務。</li>
+                    <li><strong>發送的資料</strong>：興趣關鍵詞、天賦問卷回答與關鍵詞、價值觀排序與回答、基本資料（如已填寫）、深化探索資料（如已填寫）</li>
+                    <li><strong>不發送的資料</strong>：我們不會發送任何個人識別資訊（如姓名、電子郵件、電話號碼、設備識別碼）給 AI 服務</li>
+                    <li><strong>資料保護</strong>：所有資料傳輸均使用 HTTPS 加密</li>
+                    <li><strong>第三方保護標準</strong>：AI 服務提供商（Anthropic）遵循嚴格的資料保護標準，不會將您的資料用於訓練 AI 模型，並提供與我們相同或相等的資料保護</li>
+                </ul>
+            </li>
             <li><strong>Apple Sign In</strong>：用於 Apple 帳號登入。Apple 的隱私政策適用於此服務。</li>
             <li><strong>Apple App Store</strong>：用於應用分發與訂閱支付處理。Apple 的隱私政策適用於此服務。</li>
         </ul>

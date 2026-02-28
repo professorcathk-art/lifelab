@@ -95,10 +95,20 @@ struct ValuesRankingView: View {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 18, weight: .bold))
                     }
-                    .foregroundColor(BrandColors.invertedText) // Black text on white button
+                    .foregroundColor(
+                        // CRITICAL: Ensure proper contrast
+                        // Dark mode: White background → Black text
+                        // Light mode: Dark charcoal background → White text
+                        ThemeManager.shared.isDarkMode ? Color.black : Color.white
+                    )
                     .frame(maxWidth: .infinity)
                     .frame(height: 50)
-                    .background(BrandColors.primaryText) // White background
+                    .background(
+                        // CRITICAL: Ensure proper contrast
+                        // Dark mode: White background
+                        // Light mode: Dark charcoal background
+                        ThemeManager.shared.isDarkMode ? Color.white : BrandColors.primaryText
+                    )
                     .clipShape(Capsule()) // Pill shape
                 }
                 .buttonStyle(.plain)

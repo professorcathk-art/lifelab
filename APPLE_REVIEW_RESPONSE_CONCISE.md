@@ -1,62 +1,46 @@
-# Apple App Review Response - LifeLab (Concise Version)
+# Response to App Store Review Feedback
 
-## Answers to Apple's Questions
-
-### 1. Does your app use third-party AI service?
-
-**Yes.** Our app uses AIML API (api.aimlapi.com) with Anthropic Claude Sonnet 4.5 model to generate personalized career guidance and life blueprint recommendations.
+**Submission ID:** 38cfd67e-8fed-40d4-8876-fadcd50f8cfe  
+**Version:** 1.3.1 (Build 2)
 
 ---
 
-### 2. What personal data does it collect/send to third-party AI service?
+Dear App Review Team,
 
-**Data sent to AI service (only for generating recommendations):**
+Thank you for your feedback. We have addressed all issues identified in your review:
 
-- **Basic info** (optional): Region, age, occupation, salary, family status, education
-- **Interests**: User-selected keywords
-- **Strengths**: Selected keywords and questionnaire answers
-- **Values**: Core values ranking and reflection answers
-- **Deepening data** (optional): Flow diary entries, resource inventory, acquired strengths
+## 1. Guidelines 5.1.1(i) and 5.1.2(i) - Privacy - Data Collection and Data Use
 
-**Important:**
-- **No PII sent**: No names, emails, device IDs, or authentication tokens
-- **HTTPS encrypted** transmission
-- Data sent **only when user clicks** "開啟我的理想人生" button
-- **Not used for training** (per AIML API privacy policy)
+**Resolved:**
+- ✅ Added mandatory AI service consent checkbox on login/signup page. Users must explicitly agree before any data is sent to the AI service.
+- ✅ Privacy policy updated to clearly state:
+  - **What data is sent**: Interests, strengths, values, basic info, and deepening exploration data
+  - **Who receives it**: Anthropic Claude Sonnet 4.5 (Anthropic Inc.) via AIML API
+  - **User permission**: Explicit consent required before data sharing
+  - **Data protection**: HTTPS encryption; Anthropic does not use data for AI training
 
-**Data NOT sent:**
-- Authentication credentials
-- Email addresses
-- Device identifiers
-- Payment information
+## 2. Guideline 4.0 - Design - Typography
 
----
+**Resolved:**
+- ✅ Fixed all theme switching issues. All UI elements now properly update when switching between light and dark modes.
+- ✅ Ensured all text is clearly visible: white text on dark backgrounds (dark mode), dark text on light backgrounds (light mode).
+- ✅ Conducted comprehensive review of all screens for consistent typography and readability.
 
-### 3. Does the app obtain user's consent before sending data?
+## 3. Guideline 2.1 - Performance - App Completeness (IAP Submission)
 
-**Yes.** Explicit consent is obtained through:
+**Resolved:**
+- ✅ All three subscription products (年/季/月付) have been submitted for review with complete metadata.
+- ✅ New binary (Version 1.3.1, Build 2) uploaded with IAP products properly linked.
 
-1. **Explicit user action**: User must click "開啟我的理想人生" button, which clearly states "解鎖專屬 AI 深度分析" (Unlock exclusive AI deep analysis)
+## 4. Guideline 2.1 - Performance - App Completeness (IAP Purchase Bug)
 
-2. **Transparent disclosure**: Before data collection, users see: "請填寫您的基本資料，這將幫助AI為您提供更精準的建議" (Please fill in your basic information, which will help AI provide more accurate recommendations)
+**Resolved:**
+- ✅ Fixed purchase flow: Purchase is immediately acknowledged; AI generation runs in background (non-blocking).
+- ✅ Added dedicated progress page with visual indicator for AI generation.
+- ✅ Enhanced error handling with retry logic and clear error messages.
+- ✅ Improved subscription status verification to prevent false positives.
 
-3. **Privacy Policy**: Available in App Store Connect and explains AI service usage
+All issues have been resolved. The app is ready for review.
 
-4. **User control**: Users can delete account/data anytime via Settings → Account → Delete Account
-
-5. **No automatic transmission**: Data sent only when user explicitly requests AI generation
-
-**Consent flow:**
-User fills information → Sees AI usage notice → Clicks button (explicit consent) → Data sent to AI → Receives recommendations
-
----
-
-## How to Resubmit
-
-1. **App Store Connect** → My Apps → LifeLab → Resolution Center → Reply to App Review
-2. **Copy the 3 answers above** into the reply box
-3. **Update App Privacy**:
-   - Data Collection: Yes
-   - Third-Party Sharing: Yes → Add AIML API (Purpose: AI Analysis, Data: User Content, Not Linked to User: Yes)
-4. **Privacy Policy URL**: Ensure it's filled in App Information page
-5. **Submit for Review**
+Best regards,  
+LifeLab Development Team

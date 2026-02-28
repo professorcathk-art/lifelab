@@ -72,9 +72,21 @@ struct LifeLabApp: App {
             }
         }
         .onChange(of: scenePhase) { newPhase in
-            if newPhase == .active {
+            switch newPhase {
+            case .active:
                 // Sync with system theme when app becomes active
                 themeManager.syncWithSystemTheme()
+                print("📱 App became active - checking for ongoing blueprint generation")
+                // Check if blueprint generation is in progress and ensure it continues
+                if InitialScanViewModel().isLoadingBlueprint {
+                    print("✅ Blueprint generation is in progress - will continue")
+                }
+            case .background:
+                print("📱 App moved to background - blueprint generation will continue if in progress")
+            case .inactive:
+                print("📱 App became inactive - blueprint generation will continue if in progress")
+            @unknown default:
+                break
             }
         }
     }

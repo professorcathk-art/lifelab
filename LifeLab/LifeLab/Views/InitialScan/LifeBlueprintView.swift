@@ -184,6 +184,8 @@ struct LifeBlueprintView: View {
 // MARK: - Vocation Direction Card with Data Chips
 struct VocationDirectionCard: View {
     let direction: VocationDirection
+    // CRITICAL: Observe theme changes to ensure proper updates
+    @StateObject private var themeManager = ThemeManager.shared
     
     var body: some View {
         VStack(alignment: .leading, spacing: BrandSpacing.md) {
@@ -213,11 +215,11 @@ struct VocationDirectionCard: View {
         }
         .padding(BrandSpacing.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(BrandColors.surface)
+        .background(BrandColors.surface) // Theme-aware: dark charcoal in dark mode, white in light mode
         .cornerRadius(16)
         .overlay(
             RoundedRectangle(cornerRadius: 16)
-                .stroke(BrandColors.borderColor, lineWidth: 1)
+                .stroke(BrandColors.borderColor, lineWidth: 1) // Theme-aware border
         )
         .shadow(
             color: BrandColors.cardShadow.color,
@@ -233,6 +235,8 @@ struct DataChip: View {
     let icon: String
     let title: String
     let value: String
+    // CRITICAL: Observe theme changes to ensure proper updates
+    @StateObject private var themeManager = ThemeManager.shared
     
     var body: some View {
         HStack(spacing: BrandSpacing.xs) {
@@ -243,7 +247,7 @@ struct DataChip: View {
             Text(title)
                 .font(BrandTypography.caption)
                 .foregroundColor(
-                    ThemeManager.shared.isDarkMode 
+                    themeManager.isDarkMode 
                         ? BrandColors.secondaryText
                         : BrandColors.dayModeDataChipText
                 )
@@ -256,7 +260,7 @@ struct DataChip: View {
         .padding(.horizontal, BrandSpacing.sm)
         .padding(.vertical, BrandSpacing.xs)
         .background(
-            ThemeManager.shared.isDarkMode 
+            themeManager.isDarkMode 
                 ? BrandColors.surface.opacity(0.5) // Dark mode background
                 : BrandColors.dayModeDataChipBackground // Very light purple in day mode
         )

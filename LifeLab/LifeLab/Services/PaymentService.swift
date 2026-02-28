@@ -33,12 +33,39 @@ class PaymentService: ObservableObject {
         errorMessage = nil
         
         do {
+            print("🔄 Requesting products from App Store...")
+            print("📦 Product IDs: \(productIDs)")
             let products = try await Product.products(for: productIDs)
             self.products = products.sorted { $0.price < $1.price }
-            print("✅ Loaded \(products.count) products from App Store")
+            print("✅ Loaded \(products.count)/\(productIDs.count) products from App Store")
+            
+            if products.count < productIDs.count {
+                let loadedIDs = Set(products.map { $0.id })
+                let missingIDs = productIDs.filter { !loadedIDs.contains($0) }
+                print("⚠️ Missing products: \(missingIDs)")
+                print("💡 This may be normal if products are still syncing to sandbox environment")
+            }
+            
+            // Log each loaded product
+            for product in products {
+                print("   - \(product.id): \(product.displayPrice) (\(product.type))")
+            }
         } catch {
-            errorMessage = "無法載入產品：\(error.localizedDescription)"
-            print("❌ Failed to load products: \(error.localizedDescription)")
+            let errorDescription = error.localizedDescription
+            // Professional error message for product loading
+            if errorDescription.contains("network") || errorDescription.contains("connection") {
+                errorMessage = "無法連接到 App Store。\n\n請檢查：\n• 設備是否已連接到網絡\n• App Store 服務是否可用\n\n確認後請稍後再試。"
+            } else {
+                errorMessage = "無法載入產品資訊。\n\n\(errorDescription)\n\n請稍後再試，如問題持續存在，請聯繫客服。"
+            }
+            print("❌ Failed to load products: \(errorDescription)")
+            print("   Error type: \(type(of: error))")
+            print("   Error details: \(error)")
+            
+            // Provide more specific error messages
+            if let storeKitError = error as? StoreKitError {
+                print("   StoreKit error code: \(storeKitError)")
+            }
         }
         
         isLoading = false
@@ -77,7 +104,7 @@ class PaymentService: ObservableObject {
                 
                 // IMPORTANT: After successful purchase, ensure user data is synced to Supabase
                 // This ensures data persistence and allows data restoration after renewal
-                if let userId = AuthService.shared.currentUser?.id {
+                if AuthService.shared.currentUser?.id != nil {
                     Task {
                         await DataService.shared.syncToSupabase()
                         print("✅ User data synced to Supabase after purchase")
@@ -105,18 +132,25 @@ class PaymentService: ObservableObject {
                 return false
                 
             case .pending:
-                errorMessage = "購買待處理中，請稍候"
+                errorMessage = "購買正在處理中。\n\n您的購買請求已提交，正在等待審核。完成後您將收到通知。"
                 print("⚠️ Purchase pending - requires approval")
                 return false
                 
             @unknown default:
-                errorMessage = "未知錯誤"
+                errorMessage = "購買過程中發生未知錯誤。\n\n請稍後再試，如問題持續存在，請聯繫客服。"
                 print("❌ Unknown purchase result")
                 return false
             }
         } catch {
             let errorDescription = error.localizedDescription
-            errorMessage = "購買失敗：\(errorDescription)"
+            // Professional error message based on error type
+            if errorDescription.contains("network") || errorDescription.contains("connection") {
+                errorMessage = "無法連接到 App Store。\n\n請檢查：\n• 設備是否已連接到網絡\n• App Store 服務是否可用\n\n確認後請稍後再試。"
+            } else if errorDescription.contains("payment") || errorDescription.contains("billing") {
+                errorMessage = "支付處理失敗。\n\n請檢查：\n• Apple ID 是否已設置付款方式\n• 付款方式是否有效\n• 是否有足夠的餘額\n\n如需協助，請聯繫 Apple 客服。"
+            } else {
+                errorMessage = "購買失敗。\n\n\(errorDescription)\n\n請稍後再試，如問題持續存在，請聯繫客服。"
+            }
             print("❌ Purchase failed: \(errorDescription)")
             print("   Error details: \(error)")
             throw error
@@ -134,7 +168,13 @@ class PaymentService: ObservableObject {
             await updatePurchasedProducts()
             print("✅ Purchases restored")
         } catch {
-            errorMessage = "恢復購買失敗：\(error.localizedDescription)"
+            // Professional error message for restore purchases
+            let errorDescription = error.localizedDescription
+            if errorDescription.contains("network") || errorDescription.contains("connection") {
+                errorMessage = "無法連接到 App Store。\n\n請檢查：\n• 設備是否已連接到網絡\n• App Store 服務是否可用\n\n確認後請稍後再試。"
+            } else {
+                errorMessage = "恢復購買失敗。\n\n\(errorDescription)\n\n請稍後再試，如問題持續存在，請聯繫客服。"
+            }
             print("❌ Failed to restore purchases: \(error.localizedDescription)")
         }
     }

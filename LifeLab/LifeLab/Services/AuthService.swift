@@ -66,6 +66,14 @@ class AuthService: ObservableObject {
                 self.isAuthenticated = true
                 saveUser(user)
                 print("✅ Set new user: \(supabaseUser.id)")
+                
+                // Save AI consent if pending (from login page)
+                if UserDefaults.standard.bool(forKey: "lifelab_ai_consent_pending") {
+                    let consentKey = "lifelab_ai_consent_\(supabaseUser.id)"
+                    UserDefaults.standard.set(true, forKey: consentKey)
+                    UserDefaults.standard.removeObject(forKey: "lifelab_ai_consent_pending")
+                    print("✅ Saved AI consent for user: \(supabaseUser.id)")
+                }
             }
             
             // CRITICAL: Now load new user's local data
@@ -152,6 +160,14 @@ class AuthService: ObservableObject {
                 self.isAuthenticated = true
                 saveUser(user)
                 print("✅ Set new user: \(supabaseUser.id)")
+                
+                // Save AI consent if pending (from login page)
+                if UserDefaults.standard.bool(forKey: "lifelab_ai_consent_pending") {
+                    let consentKey = "lifelab_ai_consent_\(supabaseUser.id)"
+                    UserDefaults.standard.set(true, forKey: consentKey)
+                    UserDefaults.standard.removeObject(forKey: "lifelab_ai_consent_pending")
+                    print("✅ Saved AI consent for user: \(supabaseUser.id)")
+                }
             }
             
             // CRITICAL: Now load new user's local data (if exists from previous session)
@@ -250,6 +266,14 @@ class AuthService: ObservableObject {
                 self.isAuthenticated = true
                 saveUser(user)
                 print("✅ Set new user: \(supabaseUser.id)")
+                
+                // Save AI consent if pending (from login page)
+                if UserDefaults.standard.bool(forKey: "lifelab_ai_consent_pending") {
+                    let consentKey = "lifelab_ai_consent_\(supabaseUser.id)"
+                    UserDefaults.standard.set(true, forKey: consentKey)
+                    UserDefaults.standard.removeObject(forKey: "lifelab_ai_consent_pending")
+                    print("✅ Saved AI consent for user: \(supabaseUser.id)")
+                }
             }
             
             // CRITICAL: Now load new user's local data
@@ -419,7 +443,7 @@ class AuthService: ObservableObject {
         } else {
             print("⚠️ No Supabase session found (user needs to login)")
             // Check if we have local user data (from previous session)
-            if let localUser = currentUser {
+            if currentUser != nil {
                 print("📱 Found local user data, but no Supabase session. User needs to login again.")
             }
         }

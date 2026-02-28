@@ -5,8 +5,10 @@ struct DeepeningExplorationView: View {
     @EnvironmentObject var themeManager: ThemeManager
     @State private var selectedStep: DeepeningExplorationStep?
     @State private var isGeneratingNewVersion = false
-    @State private var isGeneratingActionPlan = false
-    @State private var actionPlanGenerated = false
+    // Use shared state from DataService to sync with TaskManagementView
+    private var isGeneratingActionPlan: Bool {
+        dataService.isGeneratingActionPlan
+    }
     @State private var showNewVersionSuccess = false
     @State private var latestVersionNumber = 1
     @State private var showActionPlanSuccess = false
@@ -151,10 +153,11 @@ struct DeepeningExplorationView: View {
                         Text(isGeneratingNewVersion ? "正在生成..." : "生成更新版生命藍圖 (Version \(latestVersionNumber + 1))")
                     } else {
                         Text("請等待 \(cooldownRemainingMinutes) 分鐘後再生成")
+                            .foregroundColor(themeManager.isDarkMode ? Color.white : Color.black)
                     }
                 }
                 .font(BrandTypography.headline)
-                .foregroundColor(BrandColors.invertedText)
+                .foregroundColor(canGenerateBlueprint() ? BrandColors.invertedText : (themeManager.isDarkMode ? Color.white : Color.black))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, BrandSpacing.lg)
                 .background(
@@ -178,9 +181,11 @@ struct DeepeningExplorationView: View {
             .disabled(isGeneratingNewVersion || !canGenerateBlueprint())
             
             // Only show action plan button if version 2+ exists and no action plan yet
-            if latestVersionNumber >= 2 && dataService.userProfile?.actionPlan == nil && !actionPlanGenerated {
+            // CRITICAL: Check both dataService.userProfile?.actionPlan and isGeneratingActionPlan
+            // This ensures button disappears immediately when generation starts or completes
+            if latestVersionNumber >= 2 && dataService.userProfile?.actionPlan == nil && !isGeneratingActionPlan {
                 Button(action: {
-                    guard !isGeneratingActionPlan && !actionPlanGenerated else { return }
+                    guard !isGeneratingActionPlan && dataService.userProfile?.actionPlan == nil else { return }
                     checkFavoriteAndGenerateActionPlan()
                 }) {
                     VStack(spacing: BrandSpacing.sm) {
@@ -189,15 +194,15 @@ struct DeepeningExplorationView: View {
                             ProgressView()
                                 .progressViewStyle(CircularProgressViewStyle(tint: BrandColors.invertedText))
                                 .scaleEffect(0.8)
-                        } else if actionPlanGenerated {
+                        } else if dataService.userProfile?.actionPlan != nil {
                             Image(systemName: "checkmark.circle.fill")
                         } else {
                             Image(systemName: "sparkles")
                         }
-                            Text(isGeneratingActionPlan ? "正在生成..." : actionPlanGenerated ? "行動計劃已生成" : "生成行動計劃")
+                            Text(isGeneratingActionPlan ? "行動計劃生成中" : (dataService.userProfile?.actionPlan != nil ? "行動計劃已生成" : "生成行動計劃"))
                         }
                         
-                        if !isGeneratingActionPlan && !actionPlanGenerated {
+                        if !isGeneratingActionPlan && dataService.userProfile?.actionPlan == nil {
                             Text("請先在編輯頁面選擇一個方向設為當前行動方向（⭐）")
                                 .font(BrandTypography.caption)
                                 .foregroundColor(BrandColors.invertedText.opacity(0.9))
@@ -209,7 +214,7 @@ struct DeepeningExplorationView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, BrandSpacing.lg)
                     .background(
-                        actionPlanGenerated 
+                        dataService.userProfile?.actionPlan != nil
                             ? AnyShapeStyle(BrandColors.success)
                             : AnyShapeStyle(BrandColors.actionAccent)
                     )
@@ -224,7 +229,7 @@ struct DeepeningExplorationView: View {
                     .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isGeneratingActionPlan)
                 }
                 .buttonStyle(.plain)
-                .disabled(isGeneratingActionPlan || actionPlanGenerated)
+                .disabled(isGeneratingActionPlan || dataService.userProfile?.actionPlan != nil)
             }
         }
         .alert("成功", isPresented: $showNewVersionSuccess) {
@@ -375,27 +380,55 @@ struct DeepeningExplorationView: View {
     
     private func generateActionPlan(favoriteDirection: VocationDirection) {
         guard let profile = dataService.userProfile else { return }
-        guard !isGeneratingActionPlan else { return }
+        guard !dataService.isGeneratingActionPlan else { return }
         
-        isGeneratingActionPlan = true
+        // CRITICAL: Set shared state so both pages know generation is in progress
+        dataService.isGeneratingActionPlan = true
         
-        Task {
+        // CRITICAL: Request background task to allow generation to continue even if app goes to background
+        var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
+        backgroundTaskID = UIApplication.shared.beginBackgroundTask(withName: "GenerateActionPlan") {
+            // Task expired, end it
+            if backgroundTaskID != .invalid {
+                UIApplication.shared.endBackgroundTask(backgroundTaskID)
+                backgroundTaskID = .invalid
+            }
+        }
+        
+        // Store backgroundTaskID in a way that can be accessed from detached task
+        let taskID = backgroundTaskID
+        
+        // CRITICAL: Use detached task to prevent cancellation when view disappears
+        // This ensures generation continues even when user switches screens
+        Task.detached(priority: .userInitiated) {
             do {
                 let plan = try await AIService.shared.generateActionPlan(profile: profile, favoriteDirection: favoriteDirection)
                 await MainActor.run {
                     DataService.shared.updateUserProfile { profile in
                         profile.actionPlan = plan
                     }
-                    isGeneratingActionPlan = false
-                    actionPlanGenerated = true
+                    // CRITICAL: Set shared state to false AFTER saving action plan
+                    // This ensures button disappears immediately in both pages
+                    dataService.isGeneratingActionPlan = false
                     showActionPlanSuccess = true
+                    
+                    // End background task
+                    if taskID != .invalid {
+                        UIApplication.shared.endBackgroundTask(taskID)
+                    }
                 }
             } catch {
                 await MainActor.run {
-                    isGeneratingActionPlan = false
+                    // CRITICAL: Set shared state to false on error too
+                    dataService.isGeneratingActionPlan = false
                     print("❌ Failed to generate action plan: \(error)")
                     errorMessage = error.localizedDescription
                     showError = true
+                    
+                    // End background task
+                    if taskID != .invalid {
+                        UIApplication.shared.endBackgroundTask(taskID)
+                    }
                 }
             }
         }
@@ -410,20 +443,22 @@ struct ExplorationStepCard: View {
     let description: String
     let isCompleted: Bool
     let isUnlocked: Bool
-    
+    // CRITICAL: Observe theme changes to ensure proper updates
+    @StateObject private var themeManager = ThemeManager.shared
+
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: BrandSpacing.sm) {
                 Text(title)
                     .font(BrandTypography.headline)
-                    .foregroundColor(BrandColors.primaryText)
+                    .foregroundColor(BrandColors.primaryText) // Theme-aware: white in dark mode, dark charcoal in light mode
                 Text(description)
                     .font(BrandTypography.subheadline)
-                    .foregroundColor(BrandColors.secondaryText)
+                    .foregroundColor(BrandColors.secondaryText) // Theme-aware: light gray in dark mode, soft gray in light mode
             }
-            
+
             Spacer()
-            
+
             if isCompleted {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundColor(BrandColors.success)
@@ -439,11 +474,11 @@ struct ExplorationStepCard: View {
             }
         }
         .padding(BrandSpacing.lg)
-        .background(BrandColors.surface)
+        .background(BrandColors.surface) // Theme-aware: dark charcoal (#1C1C1E) in dark mode, white in light mode
         .cornerRadius(BrandRadius.medium)
         .overlay(
             RoundedRectangle(cornerRadius: BrandRadius.medium)
-                .stroke(BrandColors.borderColor, lineWidth: 1)
+                .stroke(BrandColors.borderColor, lineWidth: 1) // Theme-aware border
         )
         .shadow(
             color: BrandColors.cardShadow.color,
