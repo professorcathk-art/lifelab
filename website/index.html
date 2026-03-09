@@ -13,15 +13,16 @@
         }
         
         :root {
-            --primary-color: #2563eb;
-            --primary-dark: #1e40af;
+            --primary-color: #6366f1;
+            --primary-dark: #4f46e5;
             --text-primary: #0f172a;
             --text-secondary: #64748b;
             --bg-white: #ffffff;
             --bg-gray: #f8fafc;
             --border-color: #e2e8f0;
-            --gradient-start: #2563eb;
-            --gradient-end: #7c3aed;
+            --gradient-start: #6366f1;
+            --gradient-end: #8b5cf6;
+            --accent-color: #ec4899;
         }
         
         body {
@@ -55,29 +56,62 @@
         }
         
         .logo {
-            font-size: 1.5rem;
-            font-weight: 700;
+            font-size: 1.75rem;
+            font-weight: 800;
             background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
+            letter-spacing: -0.02em;
+        }
+        
+        nav {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+        
+        nav a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s;
+            font-size: 0.95rem;
+        }
+        
+        nav a:hover {
+            color: var(--primary-color);
         }
         
         /* Hero Section */
         .hero {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 6rem 2rem;
+            padding: 8rem 2rem 6rem;
             text-align: center;
+            position: relative;
+        }
+        
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.1) 0%, transparent 70%);
+            border-radius: 50%;
+            z-index: -1;
         }
         
         .hero h1 {
-            font-size: clamp(2.5rem, 5vw, 4rem);
+            font-size: clamp(2.5rem, 5vw, 4.5rem);
             font-weight: 800;
             line-height: 1.1;
             margin-bottom: 1.5rem;
             color: var(--text-primary);
-            letter-spacing: -0.02em;
+            letter-spacing: -0.03em;
         }
         
         .hero .gradient-text {
@@ -127,8 +161,8 @@
         }
         
         .feature-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            transform: translateY(-6px);
+            box-shadow: 0 20px 40px rgba(99, 102, 241, 0.12);
             border-color: var(--primary-color);
         }
         
@@ -211,6 +245,142 @@
             margin-bottom: 2rem;
         }
         
+        /* TestFlight Download Section */
+        .testflight-section {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 4rem 2rem;
+            background: var(--bg-gray);
+            border-radius: 20px;
+            margin-top: 4rem;
+            margin-bottom: 4rem;
+        }
+        
+        .testflight-content {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .testflight-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: var(--bg-white);
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            border: 2px solid var(--border-color);
+            margin-bottom: 2rem;
+            transition: all 0.3s ease;
+        }
+        
+        .testflight-badge:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+            border-color: var(--primary-color);
+        }
+        
+        .testflight-badge a {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            text-decoration: none;
+            color: var(--text-primary);
+            font-weight: 600;
+            font-size: 1.125rem;
+        }
+        
+        .testflight-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+        
+        .steps-container {
+            background: var(--bg-white);
+            padding: 2.5rem;
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            margin-top: 2rem;
+        }
+        
+        .step {
+            display: flex;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+            align-items: flex-start;
+        }
+        
+        .step:last-child {
+            margin-bottom: 0;
+        }
+        
+        .step-number {
+            flex-shrink: 0;
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.125rem;
+        }
+        
+        .step-content h4 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+        
+        .step-content p {
+            color: var(--text-secondary);
+            line-height: 1.7;
+        }
+        
+        .download-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1.125rem;
+            transition: all 0.3s ease;
+            margin-top: 1rem;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+        
+        .download-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
+        }
+        
+        .note-box {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            margin-top: 2rem;
+        }
+        
+        .note-box p {
+            color: #92400e;
+            margin: 0;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+        
         /* Footer */
         footer {
             background: var(--text-primary);
@@ -286,6 +456,12 @@
     <header>
         <div class="header-container">
             <div class="logo">LifeLab</div>
+            <nav>
+                <a href="#features">功能</a>
+                <a href="#download">下載</a>
+                <a href="/support.html">支援</a>
+                <a href="/privacy.html">隱私</a>
+            </nav>
         </div>
     </header>
     
@@ -301,7 +477,7 @@
     </section>
     
     <!-- Features Section -->
-    <section class="features">
+    <section class="features" id="features">
         <h2 class="section-title">核心功能</h2>
         <div class="features-grid">
             <div class="feature-card">
@@ -361,6 +537,81 @@
             <div class="info-item">
                 <h4>持續優化</h4>
                 <p>支援多版本生命藍圖，讓您隨著成長持續調整方向</p>
+            </div>
+        </div>
+    </section>
+    
+    <!-- TestFlight Download Section -->
+    <section class="testflight-section" id="download">
+        <div class="testflight-content">
+            <h2 class="section-title">立即體驗 LifeLab</h2>
+            <p style="text-align: center; color: var(--text-secondary); font-size: 1.125rem; margin-bottom: 2rem;">
+                透過 TestFlight 搶先體驗 LifeLab，幫助我們打造更好的產品
+            </p>
+            
+            <div style="text-align: center;">
+                <div class="testflight-badge">
+                    <a href="https://testflight.apple.com/join/7FHu4ZB1" target="_blank" rel="noopener noreferrer">
+                        <div class="testflight-icon">✈️</div>
+                        <div>
+                            <div style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 400;">透過 TestFlight 下載</div>
+                            <div>LifeLab Beta</div>
+                        </div>
+                        <div style="margin-left: auto;">→</div>
+                    </a>
+                </div>
+            </div>
+            
+            <div class="steps-container">
+                <h3 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 1.5rem; color: var(--text-primary);">下載步驟</h3>
+                
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h4>安裝 TestFlight</h4>
+                        <p>在您的 iPhone 或 iPad 上打開 App Store，搜尋並安裝 <strong>TestFlight</strong>（Apple 官方應用，完全免費）。</p>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h4>點擊下載連結</h4>
+                        <p>點擊上方的「LifeLab Beta」按鈕，或直接訪問：<br>
+                        <a href="https://testflight.apple.com/join/7FHu4ZB1" target="_blank" rel="noopener noreferrer" style="color: var(--primary-color); word-break: break-all;">https://testflight.apple.com/join/7FHu4ZB1</a></p>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h4>接受邀請</h4>
+                        <p>連結會自動開啟 TestFlight 應用程式。點擊 <strong>「接受」</strong> 加入 Beta 測試計劃。</p>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <div class="step-content">
+                        <h4>安裝 LifeLab</h4>
+                        <p>在 TestFlight 中點擊 <strong>「安裝」</strong>，LifeLab 將會下載並安裝到您的裝置上。</p>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">5</div>
+                    <div class="step-content">
+                        <h4>開始使用</h4>
+                        <p>安裝完成後，像一般應用程式一樣打開 LifeLab，開始您的生命藍圖探索之旅！</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="note-box">
+                <p>
+                    <strong>💡 提示：</strong> TestFlight 版本與正式版本功能完全相同，您可以完整體驗所有功能。
+                    測試期間如有任何問題或建議，歡迎透過應用程式內的「設定」→「意見回饋」與我們聯繫。
+                </p>
             </div>
         </div>
     </section>
