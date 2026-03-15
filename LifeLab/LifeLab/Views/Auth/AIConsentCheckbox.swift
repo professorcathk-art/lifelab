@@ -3,7 +3,7 @@ import SwiftUI
 struct AIConsentCheckbox: View {
     @Binding var hasReadTerms: Bool
     @Binding var showPrivacyPolicy: Bool
-    @StateObject private var themeManager = ThemeManager.shared
+    @ObservedObject private var themeManager = ThemeManager.shared
     
     var body: some View {
         HStack(alignment: .top, spacing: 12) {

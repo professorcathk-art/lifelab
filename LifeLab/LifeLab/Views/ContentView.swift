@@ -2,11 +2,13 @@ import SwiftUI
 import UIKit
 
 struct ContentView: View {
-    @StateObject private var dataService = DataService.shared
+    @EnvironmentObject var dataService: DataService
+    @EnvironmentObject var themeManager: ThemeManager
     @StateObject private var viewModel = InitialScanViewModel()
-    @StateObject private var themeManager = ThemeManager.shared
-    @StateObject private var subscriptionManager = SubscriptionManager.shared
-    @StateObject private var paymentService = PaymentService.shared
+    // IMPORTANT: Use @ObservedObject for shared singletons, not @StateObject
+    // @StateObject creates new instances, but singletons should be observed, not owned
+    @ObservedObject private var subscriptionManager = SubscriptionManager.shared
+    @ObservedObject private var paymentService = PaymentService.shared
     @State private var showSubscriptionExpiredAlert = false
     
     var hasCompletedInitialScan: Bool {

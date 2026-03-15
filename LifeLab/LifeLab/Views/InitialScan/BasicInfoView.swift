@@ -2,7 +2,7 @@ import SwiftUI
 
 struct BasicInfoView: View {
     @EnvironmentObject var viewModel: InitialScanViewModel
-    @StateObject private var themeManager = ThemeManager.shared
+    @ObservedObject private var themeManager = ThemeManager.shared
     @State private var selectedRegion: String = ""
     @State private var ageText: String = ""
     @State private var nameText: String = ""
@@ -261,7 +261,7 @@ struct ModernFormField<Content: View, Footer: View>: View {
     @ViewBuilder let footer: () -> Footer
     
     // CRITICAL: Observe theme changes to ensure proper updates
-    @StateObject private var themeManager = ThemeManager.shared
+    @ObservedObject private var themeManager = ThemeManager.shared
     
     init(title: String, icon: String, @ViewBuilder content: @escaping () -> Content, @ViewBuilder footer: @escaping () -> Footer = { EmptyView() }) {
         self.title = title
@@ -307,7 +307,7 @@ struct CustomTextField: View {
     @FocusState private var isFocused: Bool
     
     // CRITICAL: Observe theme changes to ensure proper updates
-    @StateObject private var themeManager = ThemeManager.shared
+    @ObservedObject private var themeManager = ThemeManager.shared
     
     var body: some View {
         ZStack(alignment: .leading) {
@@ -358,7 +358,7 @@ struct CustomPicker: View {
     @State private var showPicker = false
     
     // CRITICAL: Observe theme changes to ensure proper updates
-    @StateObject private var themeManager = ThemeManager.shared
+    @ObservedObject private var themeManager = ThemeManager.shared
     
     var body: some View {
         Button(action: {

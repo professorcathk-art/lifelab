@@ -4,7 +4,7 @@ import SwiftUI
 /// Supports both light and dark mode with consistent UI style
 struct BlueprintGenerationProgressView: View {
     @EnvironmentObject var viewModel: InitialScanViewModel
-    @StateObject private var themeManager = ThemeManager.shared
+    @ObservedObject private var themeManager = ThemeManager.shared
     @State private var animatedProgress: Double = 0.0
     @State private var currentStepIndex: Int = 0
     

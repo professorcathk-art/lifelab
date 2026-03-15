@@ -13,6 +13,7 @@ class SupabaseService: ObservableObject {
     private init() {
         // Configure URLSession with longer timeout and retry support
         // IMPORTANT: Mobile networks can be slower, so we use longer timeouts
+        // IMPORTANT: iOS 26.3 has stricter TLS requirements - ensure proper configuration
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 90.0 // 90 seconds (increased for unstable networks)
         config.timeoutIntervalForResource = 180.0 // 180 seconds (increased for unstable networks)
@@ -26,7 +27,11 @@ class SupabaseService: ObservableObject {
         config.httpShouldSetCookies = false // Don't use cookies
         config.httpCookieAcceptPolicy = .never // Don't accept cookies
         
-        self.urlSession = URLSession(configuration: config)
+        // IMPORTANT: iOS 26.3 has stricter TLS requirements
+        // URLSession automatically uses TLS 1.2+ (iOS handles this)
+        // We focus on proper error handling for TLS failures
+        
+        self.urlSession = URLSession(configuration: config, delegate: nil, delegateQueue: nil)
         initializeSupabase()
     }
     
@@ -96,7 +101,8 @@ class SupabaseService: ObservableObject {
         
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         
-        let (data, response) = try await URLSession.shared.data(for: request)
+        // IMPORTANT: Use configured urlSession (not URLSession.shared) for TLS error handling
+        let (data, response) = try await urlSession.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NSError(domain: "SupabaseService", code: -2, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
@@ -136,7 +142,8 @@ class SupabaseService: ObservableObject {
         
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         
-        let (data, response) = try await URLSession.shared.data(for: request)
+        // IMPORTANT: Use configured urlSession (not URLSession.shared) for TLS error handling
+        let (data, response) = try await urlSession.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NSError(domain: "SupabaseService", code: -2, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
@@ -661,14 +668,40 @@ class SupabaseService: ObservableObject {
                 lastError = error
                 
                 // Check if it's a network error that can be retried
+                // IMPORTANT: iOS 26.3 TLS errors - include TLS/SSL errors
                 let isNetworkError = error.domain == NSURLErrorDomain && (
                     error.code == NSURLErrorTimedOut ||
                     error.code == NSURLErrorNetworkConnectionLost ||
                     error.code == NSURLErrorNotConnectedToInternet ||
-                    error.code == NSURLErrorCannotConnectToHost
+                    error.code == NSURLErrorCannotConnectToHost ||
+                    error.code == NSURLErrorSecureConnectionFailed || // TLS error
+                    error.code == NSURLErrorServerCertificateUntrusted ||
+                    error.code == NSURLErrorServerCertificateHasBadDate ||
+                    error.code == NSURLErrorServerCertificateNotYetValid ||
+                    error.code == NSURLErrorClientCertificateRejected ||
+                    error.code == NSURLErrorClientCertificateRequired
                 )
                 
-                if isNetworkError && attempt < retryCount {
+                // Check for TLS-specific errors (iOS 26.3)
+                let isTLSError = error.domain == NSURLErrorDomain && (
+                    error.code == NSURLErrorSecureConnectionFailed ||
+                    error.localizedDescription.lowercased().contains("tls") ||
+                    error.localizedDescription.lowercased().contains("ssl") ||
+                    error.localizedDescription.lowercased().contains("secure connection")
+                )
+                
+                if isTLSError {
+                    print("🔒🔒🔒 TLS ERROR DETECTED 🔒🔒🔒")
+                    print("   Error: \(error.localizedDescription)")
+                    print("   Error code: \(error.code)")
+                    print("   This may be due to iOS 26.3 stricter TLS requirements")
+                }
+                
+                // TLS errors should not be retried (they won't resolve with retries)
+                // Only retry network connectivity errors
+                let isRetryableError = isNetworkError && !isTLSError && attempt < retryCount
+                
+                if isRetryableError {
                     let delay = Double(attempt) * 2.0 // Exponential backoff: 2s, 4s, 6s
                     print("⚠️⚠️⚠️ NETWORK ERROR (RETRYABLE) ⚠️⚠️⚠️")
                     print("   Attempt: \(attempt)/\(retryCount)")
@@ -678,6 +711,19 @@ class SupabaseService: ObservableObject {
                     print("   Retrying in \(delay) seconds...")
                     try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
                     continue
+                } else if isTLSError {
+                    // TLS errors should be thrown immediately with clear message
+                    print("❌❌❌ TLS ERROR (NOT RETRYABLE) ❌❌❌")
+                    print("   Error: \(error.localizedDescription)")
+                    print("   Error code: \(error.code)")
+                    throw NSError(
+                        domain: "SupabaseService",
+                        code: -1000,
+                        userInfo: [
+                            NSLocalizedDescriptionKey: "A TLS error caused the secure connection to fail.",
+                            NSUnderlyingErrorKey: error
+                        ]
+                    )
                 } else {
                     // Not a retryable error or max retries reached
                     print("❌❌❌ REQUEST FAILED (FINAL) ❌❌❌")

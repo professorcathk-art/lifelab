@@ -2,7 +2,7 @@ import SwiftUI
 
 struct AIConsentView: View {
     @EnvironmentObject var viewModel: InitialScanViewModel
-    @StateObject private var themeManager = ThemeManager.shared
+    @ObservedObject private var themeManager = ThemeManager.shared
     @State private var hasReadTerms = false
     @State private var showPrivacyPolicy = false
     

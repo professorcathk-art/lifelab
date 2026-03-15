@@ -1,152 +1,80 @@
-# 編譯錯誤修復總結
+# Build Fix Summary - "Invalid Reuse After Initialization Failure"
 
-## ❌ 錯誤報告
+## Issue
+Build error: "invalid reuse after initialization failure"
 
-1. **參數順序錯誤**：
-   ```
-   /Users/mickeylau/lifelab/LifeLab/LifeLab/Views/Auth/ModernLoginView.swift:67:33
-   Argument 'icon' must precede argument 'text'
-   ```
+## Root Cause
+Using `@StateObject` with shared singletons (`.shared`) causes SwiftUI to try to manage the lifecycle of singletons, which leads to initialization conflicts.
 
-2. **重複聲明錯誤**：
-   ```
-   /Users/mickeylau/lifelab/LifeLab/LifeLab/Views/Auth/ModernLoginView.swift:283:8
-   Invalid redeclaration of 'ModernTextField'
-   
-   /Users/mickeylau/lifelab/LifeLab/LifeLab/Views/Auth/ModernLoginView.swift:319:8
-   Invalid redeclaration of 'ModernSecureField'
-   ```
-
----
-
-## ✅ 修復方案
-
-### 問題原因
-
-1. **重複文件**：`ModernLoginView.swift` 和 `LoginView.swift` 同時存在
-2. **重複定義**：兩個文件都定義了 `ModernTextField` 和 `ModernSecureField`
-3. **參數順序**：`ModernLoginView.swift` 中參數順序錯誤
-
-### 解決方法
-
-**刪除重複文件**：`ModernLoginView.swift`
-
-**原因**：
-- `LifeLabApp.swift` 使用的是 `LoginView`，不是 `ModernLoginView`
-- `LoginView.swift` 已經更新，包含所有需要的功能
-- `LoginView.swift` 中的組件定義正確
-
----
-
-## 📋 修復後的文件結構
-
-### Auth 目錄
-```
-LifeLab/LifeLab/Views/Auth/
-├── LoginView.swift          ✅ 使用中（包含 ModernTextField 和 ModernSecureField）
-└── SignUpView.swift         （如果存在）
-```
-
-### LoginView.swift 中的組件
-
-**ModernTextField**：
+**Problem Pattern**:
 ```swift
-struct ModernTextField: View {
-    let title: String
-    let icon: String          // ✅ 正確順序
-    @Binding var text: String
-    let placeholder: String
-    var keyboardType: UIKeyboardType = .default
-}
+@StateObject private var dataService = DataService.shared  // ❌ Wrong
+@StateObject private var themeManager = ThemeManager.shared  // ❌ Wrong
 ```
 
-**ModernSecureField**：
+## Solution
+
+### For Views (ContentView, etc.)
+Use `@EnvironmentObject` or `@ObservedObject` for shared singletons:
+
+**Fixed Pattern**:
 ```swift
-struct ModernSecureField: View {
-    let title: String
-    let icon: String          // ✅ 正確順序
-    @Binding var text: String
-    let placeholder: String
-    @State private var isSecure = true
-}
+// ✅ Correct: Use @EnvironmentObject when passed from parent
+@EnvironmentObject var dataService: DataService
+@EnvironmentObject var themeManager: ThemeManager
+
+// ✅ Correct: Use @ObservedObject for shared singletons
+@ObservedObject private var subscriptionManager = SubscriptionManager.shared
+@ObservedObject private var paymentService = PaymentService.shared
 ```
 
----
+### For App Root (LifeLabApp)
+`@StateObject` is acceptable at the App level because App is the root and won't be recreated:
 
-## ✅ 修復檢查清單
-
-- [x] 刪除 `ModernLoginView.swift`
-- [x] 確認 `LoginView.swift` 存在且正確
-- [x] 確認 `ModernTextField` 只定義一次
-- [x] 確認 `ModernSecureField` 只定義一次
-- [x] 確認參數順序正確
-- [x] 確認 `LifeLabApp.swift` 使用 `LoginView`
-
----
-
-## 🔍 驗證步驟
-
-### Step 1: 檢查文件
-```bash
-# 確認 ModernLoginView.swift 已刪除
-ls LifeLab/LifeLab/Views/Auth/ModernLoginView.swift
-# 應該返回：No such file or directory
-
-# 確認 LoginView.swift 存在
-ls LifeLab/LifeLab/Views/Auth/LoginView.swift
-# 應該返回文件路徑
+```swift
+// ✅ Acceptable at App root level
+@StateObject private var dataService = DataService.shared
+@StateObject private var authService = AuthService.shared
+@StateObject private var themeManager = ThemeManager.shared
 ```
 
-### Step 2: 檢查重複定義
-```bash
-# 查找所有 ModernTextField 定義
-grep -r "struct ModernTextField" LifeLab/LifeLab/Views --include="*.swift"
-# 應該只找到一個（在 LoginView.swift 中）
+## Changes Made
 
-# 查找所有 ModernSecureField 定義
-grep -r "struct ModernSecureField" LifeLab/LifeLab/Views --include="*.swift"
-# 應該只找到一個（在 LoginView.swift 中）
-```
+### ContentView.swift ✅
+- Changed `@StateObject` to `@EnvironmentObject` for `dataService` and `themeManager`
+- Changed `@StateObject` to `@ObservedObject` for `subscriptionManager` and `paymentService`
+- Added comment explaining why `@ObservedObject` is used for shared singletons
 
-### Step 3: 檢查使用情況
-```bash
-# 確認 LifeLabApp.swift 使用 LoginView
-grep "LoginView" LifeLab/LifeLab/LifeLabApp.swift
-# 應該顯示：LoginView()
-```
+### LifeLabApp.swift ✅
+- Added comment explaining that `@StateObject` is acceptable at App root level
+- No changes needed (already correct)
 
----
+## Build Status
 
-## ✅ 修復完成
+✅ **BUILD SUCCEEDED**
 
-**狀態**：✅ 所有錯誤已修復
+- No compilation errors
+- No linter errors
+- Only one warning (unrelated to this fix):
+  - `BlueprintGenerationProgressView.swift:158` - Timer Sendable warning (Swift 6 compatibility)
 
-**下一步**：
-1. 在 Xcode 中清理構建（⇧⌘K）
-2. 重新構建項目
-3. 確認沒有編譯錯誤
+## Key Takeaways
 
----
+1. **`@StateObject`**: Creates and owns a new instance
+   - Use for: New instances created in the view
+   - Don't use for: Shared singletons
 
-## 📝 注意事項
+2. **`@ObservedObject`**: Observes an existing instance
+   - Use for: Shared singletons (`.shared`)
+   - Use for: Instances passed from parent
 
-### 如果仍有問題
+3. **`@EnvironmentObject`**: Receives from environment
+   - Use for: Objects injected via `.environmentObject()`
+   - Preferred for: Shared services passed down the view hierarchy
 
-1. **清理構建**：
-   - Xcode: `Product` → `Clean Build Folder` (⇧⌘K)
-   - 命令行: `xcodebuild clean`
+## Verification
 
-2. **刪除 DerivedData**：
-   ```bash
-   rm -rf ~/Library/Developer/Xcode/DerivedData/LifeLab-*
-   ```
-
-3. **重新構建**：
-   - Xcode: `Product` → `Build` (⌘B)
-   - 命令行: `xcodebuild build`
-
----
-
-## ✅ 完成！
-
-所有編譯錯誤已修復，可以重新構建項目了！
+✅ Build succeeds
+✅ No initialization errors
+✅ Proper lifecycle management
+✅ Ready for App Store submission

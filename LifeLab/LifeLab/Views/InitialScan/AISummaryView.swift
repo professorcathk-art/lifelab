@@ -2,7 +2,7 @@ import SwiftUI
 
 struct AISummaryView: View {
     @EnvironmentObject var viewModel: InitialScanViewModel
-    @StateObject private var themeManager = ThemeManager.shared
+    @ObservedObject private var themeManager = ThemeManager.shared
     @EnvironmentObject var dataService: DataService
     var isReviewMode: Bool = false // Flag to indicate if in review mode
     

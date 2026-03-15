@@ -4,8 +4,8 @@ import StoreKit
 struct PaymentView: View {
     @EnvironmentObject var viewModel: InitialScanViewModel
     @EnvironmentObject var dataService: DataService
-    @StateObject private var paymentService = PaymentService.shared
-    @StateObject private var themeManager = ThemeManager.shared
+    @ObservedObject private var paymentService = PaymentService.shared
+    @ObservedObject private var themeManager = ThemeManager.shared
     @State private var selectedPackage: SubscriptionPackage = .yearly // Always yearly in this stage
     @State private var isProcessing = false
     @State private var showError = false
@@ -36,21 +36,21 @@ struct PaymentView: View {
             }
         }
         
-        var price: String {
-            // Fixed USD prices (monthly equivalent prices)
-            // These are the exact prices to display, regardless of StoreKit product prices
+        // Fallback prices (USD) - only used if StoreKit products not available
+        var fallbackPrice: String {
             switch self {
-            case .yearly: return "US$ 7.59"      // USD 7.59/month (paid annually)
-            case .quarterly: return "US$ 9.99"   // USD 9.99/month (paid quarterly)
-            case .monthly: return "US$ 17.99"    // USD 17.99/month (paid monthly)
+            case .yearly: return "89.99 USD"
+            case .quarterly: return "29.99 USD"
+            case .monthly: return "17.99 USD"
             }
         }
         
-        var period: String {
+        // Billing period label
+        var billingPeriod: String {
             switch self {
-            case .yearly: return "/月（年付）"
-            case .quarterly: return "/月（季付，90天週期）"
-            case .monthly: return "/月"
+            case .yearly: return "年"
+            case .quarterly: return "季"
+            case .monthly: return "月"
             }
         }
         
@@ -62,35 +62,62 @@ struct PaymentView: View {
             }
         }
         
-        func price(from products: [Product]) -> String {
+        // Get ACTUAL billed amount from StoreKit (most prominent)
+        // IMPORTANT: This is the amount Apple will charge, formatted in user's locale/currency
+        func billedAmount(from products: [Product]) -> String {
             if let product = products.first(where: { $0.id == productID }) {
-                // Convert product.price (Decimal) to USD format
-                // StoreKit will handle currency conversion at payment time
-                let priceDecimal = product.price
-                let priceDouble = NSDecimalNumber(decimal: priceDecimal).doubleValue
-                
-                // Format as USD
-                let formatter = NumberFormatter()
-                formatter.numberStyle = .currency
-                formatter.currencyCode = "USD"
-                formatter.maximumFractionDigits = 2
-                
-                if let formattedPrice = formatter.string(from: NSNumber(value: priceDouble)) {
-                    return formattedPrice
-                }
-                // Fallback: format manually with USD
-                return String(format: "$%.2f", priceDouble)
+                // Use StoreKit's displayPrice which handles:
+                // - Currency conversion (USD, EUR, JPY, etc.)
+                // - Locale formatting (commas, decimal separators)
+                // - Currency symbols
+                return product.displayPrice
             }
-            return price // Fallback
+            // Fallback to fixed USD if StoreKit product not available
+            return fallbackPrice
         }
         
-        // Return fixed USD monthly price
-        // IMPORTANT: Always use fixed prices, do NOT calculate from StoreKit product prices
-        // StoreKit will handle currency conversion at payment time, but we display fixed USD prices
-        func monthlyPrice(from products: [Product]) -> String {
-            // Always return fixed USD prices, regardless of StoreKit product prices
-            // This ensures consistent display across all regions
-            return price
+        // Calculate monthly equivalent (subordinate, smaller text)
+        // Only shown for yearly and quarterly subscriptions
+        // IMPORTANT: This must be LESS prominent than billed amount
+        // CRITICAL: Must use the SAME currency as the billed amount (from product.priceFormatStyle)
+        func monthlyEquivalent(from products: [Product]) -> String? {
+            guard let product = products.first(where: { $0.id == productID }) else {
+                // Fallback calculation if StoreKit product not available
+                switch self {
+                case .yearly:
+                    return "約 7.59 USD/月"
+                case .quarterly:
+                    return "約 9.99 USD/月"
+                case .monthly:
+                    return nil // No monthly equivalent for monthly subscription
+                }
+            }
+            
+            // Calculate monthly equivalent from actual StoreKit price
+            let priceDecimal = product.price
+            let priceDouble = NSDecimalNumber(decimal: priceDecimal).doubleValue
+            
+            let monthlyPrice: Double
+            switch self {
+            case .yearly:
+                monthlyPrice = priceDouble / 12.0
+            case .quarterly:
+                monthlyPrice = priceDouble / 3.0
+            case .monthly:
+                return nil // No monthly equivalent for monthly subscription
+            }
+            
+            // CRITICAL: Use product.priceFormatStyle to get the SAME currency as displayPrice
+            // This ensures monthly equivalent uses the exact same currency formatting
+            // product.priceFormatStyle contains the currency information used by displayPrice
+            let priceFormatStyle = product.priceFormatStyle
+            
+            // Format the monthly price using the SAME format style as the product
+            // This ensures currency code, symbol, and formatting match exactly
+            let monthlyPriceDecimal = Decimal(monthlyPrice)
+            let formattedMonthlyPrice = monthlyPriceDecimal.formatted(priceFormatStyle)
+            
+            return "約 \(formattedMonthlyPrice)/月"
         }
     }
     
@@ -195,14 +222,17 @@ struct PaymentView: View {
                             .padding()
                     } else {
                         // Show all subscription packages: yearly, quarterly, monthly
-                        // All packages display monthly price
+                        // IMPORTANT: Display billed amount prominently, monthly equivalent subordinate
                         ForEach(SubscriptionPackage.allCases, id: \.self) { package in
                             PackageCard(
                                 package: package,
                                 isSelected: selectedPackage == package,
-                                price: paymentService.products.isEmpty 
-                                    ? package.monthlyPrice(from: []) // Use monthlyPrice for all packages
-                                    : package.monthlyPrice(from: paymentService.products), // Use monthlyPrice for all packages
+                                billedAmount: paymentService.products.isEmpty 
+                                    ? package.billedAmount(from: [])
+                                    : package.billedAmount(from: paymentService.products),
+                                monthlyEquivalent: paymentService.products.isEmpty
+                                    ? package.monthlyEquivalent(from: [])
+                                    : package.monthlyEquivalent(from: paymentService.products),
                                 onSelect: {
                                     selectedPackage = package
                                 }
@@ -532,18 +562,13 @@ struct ValuePropositionItem: View {
 }
 
 // MARK: - Package Card Component (Theme-Aware)
+// IMPORTANT: Apple Guideline 3.1.2(c) - Billed amount must be most prominent
 struct PackageCard: View {
     let package: PaymentView.SubscriptionPackage
     let isSelected: Bool
-    let price: String
+    let billedAmount: String // The actual amount billed (most prominent)
+    let monthlyEquivalent: String? // Monthly equivalent (subordinate, smaller)
     let onSelect: () -> Void
-    
-    init(package: PaymentView.SubscriptionPackage, isSelected: Bool, price: String? = nil, onSelect: @escaping () -> Void) {
-        self.package = package
-        self.isSelected = isSelected
-        self.price = price ?? package.price
-        self.onSelect = onSelect
-    }
     
     var isYearly: Bool {
         package == .yearly
@@ -580,14 +605,25 @@ struct PackageCard: View {
                             }
                         }
                         
-                        HStack(alignment: .firstTextBaseline, spacing: BrandSpacing.xs) {
-                            Text(price)
-                                .font(BrandTypography.title2)
-                                .fontWeight(.bold)
-                                .foregroundColor(BrandColors.primaryText)
-                            Text(package.period)
-                                .font(BrandTypography.subheadline)
-                                .foregroundColor(BrandColors.secondaryText)
+                        // CRITICAL: Billed amount is MOST PROMINENT (large, bold)
+                        VStack(alignment: .leading, spacing: BrandSpacing.xs) {
+                            HStack(alignment: .firstTextBaseline, spacing: BrandSpacing.xs) {
+                                Text(billedAmount)
+                                    .font(BrandTypography.title) // Large, prominent font
+                                    .fontWeight(.bold) // Bold for emphasis
+                                    .foregroundColor(BrandColors.primaryText)
+                                Text("/\(package.billingPeriod)")
+                                    .font(BrandTypography.title3) // Smaller than billed amount
+                                    .foregroundColor(BrandColors.secondaryText)
+                            }
+                            
+                            // Monthly equivalent (subordinate, smaller, less prominent)
+                            if let monthlyEq = monthlyEquivalent {
+                                Text(monthlyEq)
+                                    .font(BrandTypography.caption) // Much smaller font
+                                    .foregroundColor(BrandColors.tertiaryText) // Less prominent color
+                                    .padding(.top, 2) // Small spacing
+                            }
                         }
                     }
                     

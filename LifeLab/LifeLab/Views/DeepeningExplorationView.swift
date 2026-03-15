@@ -444,7 +444,7 @@ struct ExplorationStepCard: View {
     let isCompleted: Bool
     let isUnlocked: Bool
     // CRITICAL: Observe theme changes to ensure proper updates
-    @StateObject private var themeManager = ThemeManager.shared
+    @ObservedObject private var themeManager = ThemeManager.shared
 
     var body: some View {
         HStack {

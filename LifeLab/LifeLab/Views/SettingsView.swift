@@ -4,7 +4,7 @@ import UIKit
 struct SettingsView: View {
     @EnvironmentObject var dataService: DataService
     @EnvironmentObject var authService: AuthService
-    @StateObject private var themeManager = ThemeManager.shared
+    @ObservedObject private var themeManager = ThemeManager.shared
     @State private var showExportAlert = false
     @State private var showDeleteAlert = false
     @State private var showDeleteAccountAlert = false

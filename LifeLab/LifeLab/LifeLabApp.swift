@@ -4,6 +4,8 @@ import UIKit
 
 @main
 struct LifeLabApp: App {
+    // IMPORTANT: For shared singletons in App, we can use @StateObject at the root level
+    // This is safe because App is the root and won't be recreated
     @StateObject private var dataService = DataService.shared
     @StateObject private var authService = AuthService.shared
     @StateObject private var themeManager = ThemeManager.shared

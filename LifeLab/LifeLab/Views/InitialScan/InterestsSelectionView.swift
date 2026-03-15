@@ -2,7 +2,7 @@ import SwiftUI
 
 struct InterestsSelectionView: View {
     @EnvironmentObject var viewModel: InitialScanViewModel
-    @StateObject private var themeManager = ThemeManager.shared
+    @ObservedObject private var themeManager = ThemeManager.shared
     @State private var hasStarted = false
     
     var body: some View {

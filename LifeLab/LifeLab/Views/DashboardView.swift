@@ -205,7 +205,7 @@ struct ProgressCard: View {
     let isCompleted: Bool
     let progress: Double
     // CRITICAL: Observe theme changes to ensure proper updates
-    @StateObject private var themeManager = ThemeManager.shared
+    @ObservedObject private var themeManager = ThemeManager.shared
     
     init(title: String, isCompleted: Bool, progress: Double = 0.0) {
         self.title = title

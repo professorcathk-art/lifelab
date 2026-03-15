@@ -3,7 +3,7 @@ import AuthenticationServices
 
 struct LoginView: View {
     @EnvironmentObject var authService: AuthService
-    @StateObject private var themeManager = ThemeManager.shared
+    @ObservedObject private var themeManager = ThemeManager.shared
     @State private var email = ""
     @State private var password = ""
     @State private var name = ""
@@ -417,13 +417,28 @@ struct LoginView: View {
                 } else if nsError.domain == NSURLErrorDomain {
                     // Network error - professional message
                     let networkErrorMsg = nsError.localizedDescription
-                    if nsError.code == NSURLErrorNetworkConnectionLost ||
+                    
+                    // Check for TLS errors (iOS 26.3 specific)
+                    if nsError.code == NSURLErrorSecureConnectionFailed ||
+                       nsError.code == NSURLErrorServerCertificateUntrusted ||
+                       nsError.code == NSURLErrorServerCertificateHasBadDate ||
+                       nsError.code == NSURLErrorServerCertificateNotYetValid ||
+                       networkErrorMsg.lowercased().contains("tls") ||
+                       networkErrorMsg.lowercased().contains("ssl") ||
+                       networkErrorMsg.lowercased().contains("secure connection") {
+                        // TLS error - specific message
+                        errorMessage = "網絡連接出現問題。\n\nA TLS error caused the secure connection to fail.\n\n請檢查您的網絡連接後再試。"
+                    } else if nsError.code == NSURLErrorNetworkConnectionLost ||
                        nsError.code == NSURLErrorNotConnectedToInternet ||
                        nsError.code == NSURLErrorTimedOut {
                         errorMessage = "無法連接到網絡。\n\n請檢查：\n• 設備是否已連接到 Wi‑Fi 或行動網絡\n• 網絡信號是否穩定\n• 是否開啟了飛行模式\n\n確認後請稍後再試。"
                     } else {
                         errorMessage = "網絡連接出現問題。\n\n\(networkErrorMsg)\n\n請檢查您的網絡連接後再試。"
                     }
+                    showError = true
+                } else if nsError.domain == "SupabaseService" && nsError.code == -1000 {
+                    // TLS error from SupabaseService
+                    errorMessage = "網絡連接出現問題。\n\nA TLS error caused the secure connection to fail.\n\n請檢查您的網絡連接後再試。"
                     showError = true
                 } else {
                     // Generic error - professional message
@@ -506,7 +521,7 @@ struct ModernTextField: View {
     var keyboardType: UIKeyboardType = .default
     
     // CRITICAL: Observe theme changes to ensure proper updates
-    @StateObject private var themeManager = ThemeManager.shared
+    @ObservedObject private var themeManager = ThemeManager.shared
     
     var body: some View {
         VStack(alignment: .leading, spacing: BrandSpacing.sm) {
@@ -557,7 +572,7 @@ struct ModernSecureField: View {
     @State private var isSecure = true
     
     // CRITICAL: Observe theme changes to ensure proper updates
-    @StateObject private var themeManager = ThemeManager.shared
+    @ObservedObject private var themeManager = ThemeManager.shared
     
     var body: some View {
         VStack(alignment: .leading, spacing: BrandSpacing.sm) {

@@ -2,7 +2,7 @@ import SwiftUI
 
 struct StrengthsQuestionnaireView: View {
     @EnvironmentObject var viewModel: InitialScanViewModel
-    @StateObject private var themeManager = ThemeManager.shared
+    @ObservedObject private var themeManager = ThemeManager.shared
     @State private var currentQuestionIndex = 0
     @FocusState private var isAnswerFocused: Bool
     

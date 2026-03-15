@@ -5,7 +5,7 @@ struct SubscriptionExpiredView: View {
     @EnvironmentObject var subscriptionManager: SubscriptionManager
     @EnvironmentObject var paymentService: PaymentService
     @StateObject private var viewModel = InitialScanViewModel()
-    @StateObject private var themeManager = ThemeManager.shared
+    @ObservedObject private var themeManager = ThemeManager.shared
     
     var body: some View {
         ScrollView {

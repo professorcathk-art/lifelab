@@ -185,7 +185,7 @@ struct LifeBlueprintView: View {
 struct VocationDirectionCard: View {
     let direction: VocationDirection
     // CRITICAL: Observe theme changes to ensure proper updates
-    @StateObject private var themeManager = ThemeManager.shared
+    @ObservedObject private var themeManager = ThemeManager.shared
     
     var body: some View {
         VStack(alignment: .leading, spacing: BrandSpacing.md) {
@@ -236,7 +236,7 @@ struct DataChip: View {
     let title: String
     let value: String
     // CRITICAL: Observe theme changes to ensure proper updates
-    @StateObject private var themeManager = ThemeManager.shared
+    @ObservedObject private var themeManager = ThemeManager.shared
     
     var body: some View {
         HStack(spacing: BrandSpacing.xs) {
