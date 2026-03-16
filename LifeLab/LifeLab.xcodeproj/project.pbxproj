@@ -6,6 +6,15 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		A6BE0C702F677EAA00183721 /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = A6BE0C6F2F677EAA00183721 /* Auth */; };
+		A6BE0C722F677EAA00183721 /* Functions in Frameworks */ = {isa = PBXBuildFile; productRef = A6BE0C712F677EAA00183721 /* Functions */; };
+		A6BE0C742F677EAA00183721 /* PostgREST in Frameworks */ = {isa = PBXBuildFile; productRef = A6BE0C732F677EAA00183721 /* PostgREST */; };
+		A6BE0C762F677EAA00183721 /* Realtime in Frameworks */ = {isa = PBXBuildFile; productRef = A6BE0C752F677EAA00183721 /* Realtime */; };
+		A6BE0C782F677EAA00183721 /* Storage in Frameworks */ = {isa = PBXBuildFile; productRef = A6BE0C772F677EAA00183721 /* Storage */; };
+		A6BE0C7A2F677EAA00183721 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = A6BE0C792F677EAA00183721 /* Supabase */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		A6E1529E2F1BDBF900D8C43B /* LifeLab.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LifeLab.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +32,12 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A6BE0C742F677EAA00183721 /* PostgREST in Frameworks */,
+				A6BE0C722F677EAA00183721 /* Functions in Frameworks */,
+				A6BE0C7A2F677EAA00183721 /* Supabase in Frameworks */,
+				A6BE0C702F677EAA00183721 /* Auth in Frameworks */,
+				A6BE0C782F677EAA00183721 /* Storage in Frameworks */,
+				A6BE0C762F677EAA00183721 /* Realtime in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +80,12 @@
 			);
 			name = LifeLab;
 			packageProductDependencies = (
+				A6BE0C6F2F677EAA00183721 /* Auth */,
+				A6BE0C712F677EAA00183721 /* Functions */,
+				A6BE0C732F677EAA00183721 /* PostgREST */,
+				A6BE0C752F677EAA00183721 /* Realtime */,
+				A6BE0C772F677EAA00183721 /* Storage */,
+				A6BE0C792F677EAA00183721 /* Supabase */,
 			);
 			productName = LifeLab;
 			productReference = A6E1529E2F1BDBF900D8C43B /* LifeLab.app */;
@@ -94,6 +115,9 @@
 			);
 			mainGroup = A6E152952F1BDBF900D8C43B;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				A6BE0C6E2F677EAA00183721 /* XCRemoteSwiftPackageReference "supabase-swift" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A6E1529F2F1BDBF900D8C43B /* Products */;
 			projectDirPath = "";
@@ -248,7 +272,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = LifeLab/LifeLab.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEVELOPMENT_TEAM = YUNUL5V5R6;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -270,7 +294,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.6;
-				MARKETING_VERSION = 1.3.2;
+				MARKETING_VERSION = 1.3.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.resonance.lifelab;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -295,7 +319,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = LifeLab/LifeLab.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEVELOPMENT_TEAM = YUNUL5V5R6;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -317,7 +341,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.6;
-				MARKETING_VERSION = 1.3.2;
+				MARKETING_VERSION = 1.3.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.resonance.lifelab;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -357,6 +381,50 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A6BE0C6E2F677EAA00183721 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase-community/supabase-swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.5.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A6BE0C6F2F677EAA00183721 /* Auth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A6BE0C6E2F677EAA00183721 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Auth;
+		};
+		A6BE0C712F677EAA00183721 /* Functions */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A6BE0C6E2F677EAA00183721 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Functions;
+		};
+		A6BE0C732F677EAA00183721 /* PostgREST */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A6BE0C6E2F677EAA00183721 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = PostgREST;
+		};
+		A6BE0C752F677EAA00183721 /* Realtime */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A6BE0C6E2F677EAA00183721 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Realtime;
+		};
+		A6BE0C772F677EAA00183721 /* Storage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A6BE0C6E2F677EAA00183721 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Storage;
+		};
+		A6BE0C792F677EAA00183721 /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A6BE0C6E2F677EAA00183721 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = A6E152962F1BDBF900D8C43B /* Project object */;
 }
