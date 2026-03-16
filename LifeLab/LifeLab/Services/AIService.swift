@@ -244,6 +244,9 @@ class AIService {
             if let occupation = basicInfo.occupation {
                 context += "- 目前職業：\(occupation)\n"
             }
+            if let yearsOfExperience = basicInfo.yearsOfExperience {
+                context += "- 工作年限：\(yearsOfExperience)年\n"
+            }
             if let salary = basicInfo.annualSalaryUSD {
                 context += "- 目前年薪：\(salary) USD\n"
             }
@@ -340,7 +343,7 @@ class AIService {
         你是一位專業的職業規劃顧問。請根據以下用戶資料，生成一份深度、專業且符合現實的職業發展建議（生命藍圖）。
 
         ⚠️ 極其重要：絕對不要簡單重複用戶的輸入！你必須進行深度分析並提供具體的職業建議。
-        ⚠️ 現實性要求：建議必須符合用戶的現實狀況（年齡、職業、學歷、家庭狀況、居住地區），不應過度樂觀或不切實際。
+        ⚠️ 現實性要求：建議必須符合用戶的現實狀況（年齡、職業、工作年限、學歷、家庭狀況、居住地區），不應過度樂觀或不切實際。
         
         請以JSON格式回應，格式如下：
         
@@ -847,6 +850,9 @@ class AIService {
             }
             if let occupation = basicInfo.occupation {
                 basicInfoContext += "- 目前職業：\(occupation)（請考慮現有職業背景對轉換的影響）\n"
+            }
+            if let yearsOfExperience = basicInfo.yearsOfExperience {
+                basicInfoContext += "- 工作年限：\(yearsOfExperience)年（請考慮工作經驗對職業轉換和學習路徑的影響）\n"
             }
             if let salary = basicInfo.annualSalaryUSD {
                 basicInfoContext += "- 目前年薪：\(salary) USD（請考慮此收入水平，提供合理的資源規劃）\n"

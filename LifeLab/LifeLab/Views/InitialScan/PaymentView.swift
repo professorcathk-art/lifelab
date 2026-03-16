@@ -510,7 +510,15 @@ struct PaymentView: View {
                     // showSuccess = true
                 } else {
                     // User cancelled or purchase pending
+                    print("⚠️ Payment cancelled or pending - staying on payment page")
+                    // CRITICAL: Ensure user stays on payment page (don't navigate away)
+                    // Reset all payment-related states to prevent bypass
                     showWaitingTime = false
+                    viewModel.hasPaid = false // CRITICAL: Reset payment status to prevent bypass
+                    viewModel.isLoadingBlueprint = false // CRITICAL: Stop any blueprint generation
+                    // CRITICAL: Ensure we're on payment page (not loading page)
+                    viewModel.currentStep = .payment
+                    
                     if let errorMsg = paymentService.errorMessage, !errorMsg.isEmpty {
                         showError = true
                     }
@@ -521,6 +529,11 @@ struct PaymentView: View {
             await MainActor.run {
                 isProcessing = false
                 showWaitingTime = false
+                // CRITICAL: Reset payment status to prevent bypass
+                viewModel.hasPaid = false
+                viewModel.isLoadingBlueprint = false
+                // CRITICAL: Ensure we're on payment page (not loading page)
+                viewModel.currentStep = .payment
                 paymentService.errorMessage = "購買失敗：\(error.localizedDescription)"
                 showError = true
             }

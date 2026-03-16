@@ -282,7 +282,7 @@ class PaymentService: ObservableObject {
         )
         
         do {
-            try await SupabaseService.shared.saveUserSubscription(subscription)
+            try await SupabaseServiceV2.shared.saveUserSubscription(subscription)
             print("✅ Subscription saved to Supabase: \(planType.rawValue) plan for user \(userIdString)")
         } catch {
             print("⚠️ Failed to save subscription to Supabase: \(error.localizedDescription)")

@@ -11,7 +11,8 @@ class AuthService: ObservableObject {
     @Published var isLoading = false
     
     private let userDefaultsKey = "lifelab_current_user"
-    private let supabaseService = SupabaseService.shared
+    // Use official Supabase SDK
+    private let supabaseService = SupabaseServiceV2.shared
     
     private init() {
         loadUser()
@@ -415,36 +416,42 @@ class AuthService: ObservableObject {
     private func checkSupabaseSession() {
         print("🔍 Checking Supabase session...")
         
-        // Check if we have a valid Supabase session
-        if let supabaseUser = supabaseService.getCurrentUser() {
-            print("✅ Found Supabase session for user: \(supabaseUser.id)")
-            
-            // Restore session from Supabase
-            let user = User(
-                id: supabaseUser.id,
-                email: supabaseUser.email,
-                name: supabaseUser.name,
-                authProvider: .email // Default, could be improved
-            )
-            
-            // Update on main thread (required for @Published properties)
-            Task { @MainActor in
-                self.currentUser = user
-                self.isAuthenticated = true
-                print("✅ Restored authentication state for user: \(user.id)")
-            }
-            
-            // IMPORTANT: Load profile from Supabase immediately
-            Task {
-                print("📥 Loading user profile from Supabase for user: \(supabaseUser.id)")
-                await DataService.shared.loadFromSupabase(userId: supabaseUser.id)
-                print("✅ Completed loading profile from Supabase")
-            }
-        } else {
-            print("⚠️ No Supabase session found (user needs to login)")
-            // Check if we have local user data (from previous session)
-            if currentUser != nil {
-                print("📱 Found local user data, but no Supabase session. User needs to login again.")
+        // Check if we have a valid Supabase session (async call)
+        Task {
+            do {
+                if let supabaseUser = try await supabaseService.getCurrentUser() {
+                    print("✅ Found Supabase session for user: \(supabaseUser.id)")
+                    
+                    // Restore session from Supabase
+                    let user = User(
+                        id: supabaseUser.id,
+                        email: supabaseUser.email,
+                        name: supabaseUser.name,
+                        authProvider: .email // Default, could be improved
+                    )
+                    
+                    // Update on main thread (required for @Published properties)
+                    await MainActor.run {
+                        self.currentUser = user
+                        self.isAuthenticated = true
+                        print("✅ Restored authentication state for user: \(user.id)")
+                    }
+                    
+                    // IMPORTANT: Load profile from Supabase immediately
+                    print("📥 Loading user profile from Supabase for user: \(supabaseUser.id)")
+                    await DataService.shared.loadFromSupabase(userId: supabaseUser.id)
+                    print("✅ Completed loading profile from Supabase")
+                } else {
+                    print("⚠️ No Supabase session found (user needs to login)")
+                    // Check if we have local user data (from previous session)
+                    await MainActor.run {
+                        if self.currentUser != nil {
+                            print("📱 Found local user data, but no Supabase session. User needs to login again.")
+                        }
+                    }
+                }
+            } catch {
+                print("⚠️ Error checking Supabase session: \(error.localizedDescription)")
             }
         }
     }

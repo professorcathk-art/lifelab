@@ -5,6 +5,7 @@ struct BasicUserInfo: Codable, Equatable {
     var age: Int? // 年齡
     var name: String? // 稱呼
     var occupation: String? // 職業
+    var yearsOfExperience: Int? // 工作年限
     var annualSalaryUSD: Int? // 年薪（USD，可選）
     var familyStatus: FamilyStatus? // 家庭狀況
     var education: EducationLevel? // 學歷
@@ -26,11 +27,12 @@ struct BasicUserInfo: Codable, Equatable {
         case other = "其他"
     }
     
-    init(region: String? = nil, age: Int? = nil, name: String? = nil, occupation: String? = nil, annualSalaryUSD: Int? = nil, familyStatus: FamilyStatus? = nil, education: EducationLevel? = nil) {
+    init(region: String? = nil, age: Int? = nil, name: String? = nil, occupation: String? = nil, yearsOfExperience: Int? = nil, annualSalaryUSD: Int? = nil, familyStatus: FamilyStatus? = nil, education: EducationLevel? = nil) {
         self.region = region
         self.age = age
         self.name = name
         self.occupation = occupation
+        self.yearsOfExperience = yearsOfExperience
         self.annualSalaryUSD = annualSalaryUSD
         self.familyStatus = familyStatus
         self.education = education

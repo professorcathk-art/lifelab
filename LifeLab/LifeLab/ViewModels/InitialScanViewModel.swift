@@ -8,6 +8,18 @@ class InitialScanViewModel: ObservableObject {
     @Published var basicInfo: BasicUserInfo = BasicUserInfo()
     @Published var selectedInterests: [String] = []
     @Published var availableKeywords: [String] = []
+    // New: Track selected sub-interests per category (for Interests)
+    @Published var selectedSubInterests: [String: Set<String>] = [:] // categoryId -> Set of subInterestIds
+    // New: Track selected talents per category (for Strengths Question 1)
+    @Published var selectedTalents: [String: Set<String>] = [:] // categoryId -> Set of subTalentIds
+    // New: Track selected energies per category (for Strengths Question 2)
+    @Published var selectedEnergies: [String: Set<String>] = [:] // categoryId -> Set of subEnergyIds
+    // New: Track selected praises per category (for Strengths Question 3)
+    @Published var selectedPraises: [String: Set<String>] = [:] // categoryId -> Set of subPraiseIds
+    // New: Track selected learnings per category (for Strengths Question 4)
+    @Published var selectedLearnings: [String: Set<String>] = [:] // categoryId -> Set of subLearningIds
+    // New: Track selected fulfillments per category (for Strengths Question 5)
+    @Published var selectedFulfillments: [String: Set<String>] = [:] // categoryId -> Set of subFulfillmentIds
     @Published var timeRemaining: Int = 15
     @Published var isTimerActive = false
     @Published var showConfirmButton = false
@@ -61,10 +73,438 @@ class InitialScanViewModel: ObservableObject {
     func resetInterestSelection() {
         stopTimer()
         selectedInterests = []
+        selectedSubInterests = [:]
         availableKeywords = interestDictionary.getAllKeywords()
         timeRemaining = 15
         isTimerActive = false
         showConfirmButton = false
+    }
+    
+    // New: Get count of selected sub-interests for a category
+    func getSelectedCount(for categoryId: String) -> Int {
+        return selectedSubInterests[categoryId]?.count ?? 0
+    }
+    
+    // New: Toggle sub-interest selection
+    func toggleSubInterest(categoryId: String, subInterestId: String, label: String) {
+        if selectedSubInterests[categoryId] == nil {
+            selectedSubInterests[categoryId] = []
+        }
+        
+        if selectedSubInterests[categoryId]?.contains(subInterestId) == true {
+            // Deselect
+            selectedSubInterests[categoryId]?.remove(subInterestId)
+            selectedInterests.removeAll { $0 == label }
+        } else {
+            // Select
+            selectedSubInterests[categoryId]?.insert(subInterestId)
+            if !selectedInterests.contains(label) {
+                selectedInterests.append(label)
+            }
+        }
+    }
+    
+    // New: Check if sub-interest is selected
+    func isSubInterestSelected(categoryId: String, subInterestId: String) -> Bool {
+        return selectedSubInterests[categoryId]?.contains(subInterestId) ?? false
+    }
+    
+    // New: Get all selected sub-interest labels for final submission
+    func getAllSelectedSubInterestLabels() -> [String] {
+        let dictionary = InterestDictionary.shared
+        var labels: [String] = []
+        
+        for (categoryId, subInterestIds) in selectedSubInterests {
+            if let category = dictionary.getCategory(byId: categoryId) {
+                for subInterestId in subInterestIds {
+                    if let subInterest = category.subInterests.first(where: { $0.id == subInterestId }) {
+                        labels.append(subInterest.label)
+                    }
+                }
+            }
+        }
+        
+        return labels
+    }
+    
+    // MARK: - Talent Selection (for Strengths Question 1)
+    
+    // Get count of selected talents for a category
+    func getSelectedTalentCount(for categoryId: String) -> Int {
+        return selectedTalents[categoryId]?.count ?? 0
+    }
+    
+    // Toggle talent selection
+    func toggleTalent(categoryId: String, talentId: String, label: String, questionId: Int) {
+        if selectedTalents[categoryId] == nil {
+            selectedTalents[categoryId] = []
+        }
+        
+        // Get category title (first-level keyword)
+        guard let question = StrengthsQuestions.shared.questions.first(where: { $0.id == questionId }),
+              let categories = question.talentCategories,
+              let category = categories.first(where: { $0.id == categoryId }) else {
+            return
+        }
+        let categoryTitle = category.title
+        
+        if selectedTalents[categoryId]?.contains(talentId) == true {
+            // Deselect
+            selectedTalents[categoryId]?.remove(talentId)
+            // Remove from strength response
+            if let index = strengths.firstIndex(where: { $0.questionId == questionId }) {
+                strengths[index].selectedKeywords.removeAll { $0 == label }
+                // Only remove category title if no other sub-items are selected for this category
+                if selectedTalents[categoryId]?.isEmpty ?? true {
+                    strengths[index].selectedKeywords.removeAll { $0 == categoryTitle }
+                }
+            }
+        } else {
+            // Select
+            selectedTalents[categoryId]?.insert(talentId)
+            // Add to strength response (both category title and sub-label)
+            if let index = strengths.firstIndex(where: { $0.questionId == questionId }) {
+                // Add category title (first-level keyword) if not already present
+                if !strengths[index].selectedKeywords.contains(categoryTitle) {
+                    strengths[index].selectedKeywords.append(categoryTitle)
+                }
+                // Add sub-label (second-level keyword)
+                if !strengths[index].selectedKeywords.contains(label) {
+                    strengths[index].selectedKeywords.append(label)
+                }
+            }
+        }
+    }
+    
+    // Check if talent is selected
+    func isTalentSelected(categoryId: String, talentId: String) -> Bool {
+        return selectedTalents[categoryId]?.contains(talentId) ?? false
+    }
+    
+    // Get all selected talent labels for Question 1
+    func getAllSelectedTalentLabels(for questionId: Int) -> [String] {
+        guard let question = StrengthsQuestions.shared.questions.first(where: { $0.id == questionId }),
+              let categories = question.talentCategories else {
+            return []
+        }
+        
+        var labels: [String] = []
+        
+        for (categoryId, talentIds) in selectedTalents {
+            if let category = categories.first(where: { $0.id == categoryId }) {
+                for talentId in talentIds {
+                    if let talent = category.subTalents.first(where: { $0.id == talentId }) {
+                        labels.append(talent.label)
+                    }
+                }
+            }
+        }
+        
+        return labels
+    }
+    
+    // MARK: - Energy Selection (for Strengths Question 2)
+    
+    // Get count of selected energies for a category
+    func getSelectedEnergyCount(for categoryId: String) -> Int {
+        return selectedEnergies[categoryId]?.count ?? 0
+    }
+    
+    // Toggle energy selection
+    func toggleEnergy(categoryId: String, energyId: String, label: String, questionId: Int) {
+        if selectedEnergies[categoryId] == nil {
+            selectedEnergies[categoryId] = []
+        }
+        
+        // Get category title (first-level keyword)
+        guard let question = StrengthsQuestions.shared.questions.first(where: { $0.id == questionId }),
+              let categories = question.energyCategories,
+              let category = categories.first(where: { $0.id == categoryId }) else {
+            return
+        }
+        let categoryTitle = category.title
+        
+        if selectedEnergies[categoryId]?.contains(energyId) == true {
+            // Deselect
+            selectedEnergies[categoryId]?.remove(energyId)
+            // Remove from strength response
+            if let index = strengths.firstIndex(where: { $0.questionId == questionId }) {
+                strengths[index].selectedKeywords.removeAll { $0 == label }
+                // Only remove category title if no other sub-items are selected for this category
+                if selectedEnergies[categoryId]?.isEmpty ?? true {
+                    strengths[index].selectedKeywords.removeAll { $0 == categoryTitle }
+                }
+            }
+        } else {
+            // Select
+            selectedEnergies[categoryId]?.insert(energyId)
+            // Add to strength response (both category title and sub-label)
+            if let index = strengths.firstIndex(where: { $0.questionId == questionId }) {
+                // Add category title (first-level keyword) if not already present
+                if !strengths[index].selectedKeywords.contains(categoryTitle) {
+                    strengths[index].selectedKeywords.append(categoryTitle)
+                }
+                // Add sub-label (second-level keyword)
+                if !strengths[index].selectedKeywords.contains(label) {
+                    strengths[index].selectedKeywords.append(label)
+                }
+            }
+        }
+    }
+    
+    // Check if energy is selected
+    func isEnergySelected(categoryId: String, energyId: String) -> Bool {
+        return selectedEnergies[categoryId]?.contains(energyId) ?? false
+    }
+    
+    // Get all selected energy labels for Question 2
+    func getAllSelectedEnergyLabels(for questionId: Int) -> [String] {
+        guard let question = StrengthsQuestions.shared.questions.first(where: { $0.id == questionId }),
+              let categories = question.energyCategories else {
+            return []
+        }
+        
+        var labels: [String] = []
+        
+        for (categoryId, energyIds) in selectedEnergies {
+            if let category = categories.first(where: { $0.id == categoryId }) {
+                for energyId in energyIds {
+                    if let energy = category.subEnergies.first(where: { $0.id == energyId }) {
+                        labels.append(energy.label)
+                    }
+                }
+            }
+        }
+        
+        return labels
+    }
+    
+    // MARK: - Praise Selection (for Strengths Question 3)
+    
+    // Get count of selected praises for a category
+    func getSelectedPraiseCount(for categoryId: String) -> Int {
+        return selectedPraises[categoryId]?.count ?? 0
+    }
+    
+    // Toggle praise selection
+    func togglePraise(categoryId: String, praiseId: String, label: String, questionId: Int) {
+        if selectedPraises[categoryId] == nil {
+            selectedPraises[categoryId] = []
+        }
+        
+        // Get category title (first-level keyword)
+        guard let question = StrengthsQuestions.shared.questions.first(where: { $0.id == questionId }),
+              let categories = question.praiseCategories,
+              let category = categories.first(where: { $0.id == categoryId }) else {
+            return
+        }
+        let categoryTitle = category.title
+        
+        if selectedPraises[categoryId]?.contains(praiseId) == true {
+            // Deselect
+            selectedPraises[categoryId]?.remove(praiseId)
+            // Remove from strength response
+            if let index = strengths.firstIndex(where: { $0.questionId == questionId }) {
+                strengths[index].selectedKeywords.removeAll { $0 == label }
+                // Only remove category title if no other sub-items are selected for this category
+                if selectedPraises[categoryId]?.isEmpty ?? true {
+                    strengths[index].selectedKeywords.removeAll { $0 == categoryTitle }
+                }
+            }
+        } else {
+            // Select
+            selectedPraises[categoryId]?.insert(praiseId)
+            // Add to strength response (both category title and sub-label)
+            if let index = strengths.firstIndex(where: { $0.questionId == questionId }) {
+                // Add category title (first-level keyword) if not already present
+                if !strengths[index].selectedKeywords.contains(categoryTitle) {
+                    strengths[index].selectedKeywords.append(categoryTitle)
+                }
+                // Add sub-label (second-level keyword)
+                if !strengths[index].selectedKeywords.contains(label) {
+                    strengths[index].selectedKeywords.append(label)
+                }
+            }
+        }
+    }
+    
+    // Check if praise is selected
+    func isPraiseSelected(categoryId: String, praiseId: String) -> Bool {
+        return selectedPraises[categoryId]?.contains(praiseId) ?? false
+    }
+    
+    // Get all selected praise labels for Question 3
+    func getAllSelectedPraiseLabels(for questionId: Int) -> [String] {
+        guard let question = StrengthsQuestions.shared.questions.first(where: { $0.id == questionId }),
+              let categories = question.praiseCategories else {
+            return []
+        }
+        
+        var labels: [String] = []
+        
+        for (categoryId, praiseIds) in selectedPraises {
+            if let category = categories.first(where: { $0.id == categoryId }) {
+                for praiseId in praiseIds {
+                    if let praise = category.subPraises.first(where: { $0.id == praiseId }) {
+                        labels.append(praise.label)
+                    }
+                }
+            }
+        }
+        
+        return labels
+    }
+    
+    // MARK: - Learning Selection (for Strengths Question 4)
+    
+    // Get count of selected learnings for a category
+    func getSelectedLearningCount(for categoryId: String) -> Int {
+        return selectedLearnings[categoryId]?.count ?? 0
+    }
+    
+    // Toggle learning selection
+    func toggleLearning(categoryId: String, learningId: String, label: String, questionId: Int) {
+        if selectedLearnings[categoryId] == nil {
+            selectedLearnings[categoryId] = []
+        }
+        
+        // Get category title (first-level keyword)
+        guard let question = StrengthsQuestions.shared.questions.first(where: { $0.id == questionId }),
+              let categories = question.learningCategories,
+              let category = categories.first(where: { $0.id == categoryId }) else {
+            return
+        }
+        let categoryTitle = category.title
+        
+        if selectedLearnings[categoryId]?.contains(learningId) == true {
+            // Deselect
+            selectedLearnings[categoryId]?.remove(learningId)
+            // Remove from strength response
+            if let index = strengths.firstIndex(where: { $0.questionId == questionId }) {
+                strengths[index].selectedKeywords.removeAll { $0 == label }
+                // Only remove category title if no other sub-items are selected for this category
+                if selectedLearnings[categoryId]?.isEmpty ?? true {
+                    strengths[index].selectedKeywords.removeAll { $0 == categoryTitle }
+                }
+            }
+        } else {
+            // Select
+            selectedLearnings[categoryId]?.insert(learningId)
+            // Add to strength response (both category title and sub-label)
+            if let index = strengths.firstIndex(where: { $0.questionId == questionId }) {
+                // Add category title (first-level keyword) if not already present
+                if !strengths[index].selectedKeywords.contains(categoryTitle) {
+                    strengths[index].selectedKeywords.append(categoryTitle)
+                }
+                // Add sub-label (second-level keyword)
+                if !strengths[index].selectedKeywords.contains(label) {
+                    strengths[index].selectedKeywords.append(label)
+                }
+            }
+        }
+    }
+    
+    // Check if learning is selected
+    func isLearningSelected(categoryId: String, learningId: String) -> Bool {
+        return selectedLearnings[categoryId]?.contains(learningId) ?? false
+    }
+    
+    // Get all selected learning labels for Question 4
+    func getAllSelectedLearningLabels(for questionId: Int) -> [String] {
+        guard let question = StrengthsQuestions.shared.questions.first(where: { $0.id == questionId }),
+              let categories = question.learningCategories else {
+            return []
+        }
+        
+        var labels: [String] = []
+        
+        for (categoryId, learningIds) in selectedLearnings {
+            if let category = categories.first(where: { $0.id == categoryId }) {
+                for learningId in learningIds {
+                    if let learning = category.subLearning.first(where: { $0.id == learningId }) {
+                        labels.append(learning.label)
+                    }
+                }
+            }
+        }
+        
+        return labels
+    }
+    
+    // MARK: - Fulfillment Selection (for Strengths Question 5)
+    
+    // Get count of selected fulfillments for a category
+    func getSelectedFulfillmentCount(for categoryId: String) -> Int {
+        return selectedFulfillments[categoryId]?.count ?? 0
+    }
+    
+    // Toggle fulfillment selection
+    func toggleFulfillment(categoryId: String, fulfillmentId: String, label: String, questionId: Int) {
+        if selectedFulfillments[categoryId] == nil {
+            selectedFulfillments[categoryId] = []
+        }
+        
+        // Get category title (first-level keyword)
+        guard let question = StrengthsQuestions.shared.questions.first(where: { $0.id == questionId }),
+              let categories = question.fulfillmentCategories,
+              let category = categories.first(where: { $0.id == categoryId }) else {
+            return
+        }
+        let categoryTitle = category.title
+        
+        if selectedFulfillments[categoryId]?.contains(fulfillmentId) == true {
+            // Deselect
+            selectedFulfillments[categoryId]?.remove(fulfillmentId)
+            // Remove from strength response
+            if let index = strengths.firstIndex(where: { $0.questionId == questionId }) {
+                strengths[index].selectedKeywords.removeAll { $0 == label }
+                // Only remove category title if no other sub-items are selected for this category
+                if selectedFulfillments[categoryId]?.isEmpty ?? true {
+                    strengths[index].selectedKeywords.removeAll { $0 == categoryTitle }
+                }
+            }
+        } else {
+            // Select
+            selectedFulfillments[categoryId]?.insert(fulfillmentId)
+            // Add to strength response (both category title and sub-label)
+            if let index = strengths.firstIndex(where: { $0.questionId == questionId }) {
+                // Add category title (first-level keyword) if not already present
+                if !strengths[index].selectedKeywords.contains(categoryTitle) {
+                    strengths[index].selectedKeywords.append(categoryTitle)
+                }
+                // Add sub-label (second-level keyword)
+                if !strengths[index].selectedKeywords.contains(label) {
+                    strengths[index].selectedKeywords.append(label)
+                }
+            }
+        }
+    }
+    
+    // Check if fulfillment is selected
+    func isFulfillmentSelected(categoryId: String, fulfillmentId: String) -> Bool {
+        return selectedFulfillments[categoryId]?.contains(fulfillmentId) ?? false
+    }
+    
+    // Get all selected fulfillment labels for Question 5
+    func getAllSelectedFulfillmentLabels(for questionId: Int) -> [String] {
+        guard let question = StrengthsQuestions.shared.questions.first(where: { $0.id == questionId }),
+              let categories = question.fulfillmentCategories else {
+            return []
+        }
+        
+        var labels: [String] = []
+        
+        for (categoryId, fulfillmentIds) in selectedFulfillments {
+            if let category = categories.first(where: { $0.id == categoryId }) {
+                for fulfillmentId in fulfillmentIds {
+                    if let fulfillment = category.subFulfillment.first(where: { $0.id == fulfillmentId }) {
+                        labels.append(fulfillment.label)
+                    }
+                }
+            }
+        }
+        
+        return labels
     }
     
     func selectInterest(_ keyword: String) {
@@ -109,6 +549,10 @@ class InitialScanViewModel: ObservableObject {
     
     func confirmInterestSelection() {
         stopTimer()
+        // CRITICAL: Sync selectedSubInterests to selectedInterests before moving to next step
+        // This ensures backward compatibility with existing code that uses selectedInterests
+        let allLabels = getAllSelectedSubInterestLabels()
+        selectedInterests = allLabels
         moveToNextStep()
     }
     
@@ -240,7 +684,9 @@ class InitialScanViewModel: ObservableObject {
         case .loading:
             currentStep = .aiSummary
         case .payment:
-            currentStep = .loading
+            // CRITICAL: Don't allow going back from payment page to loading page
+            // User must complete payment to proceed
+            currentStep = .payment // Stay on payment page
         case .blueprint:
             currentStep = .payment
         }
@@ -326,7 +772,37 @@ class InitialScanViewModel: ObservableObject {
             return []
         }
         
-        // Get first-level keywords (keys of keywordHierarchy)
+        // Question 1 uses talentCategories (Bottom Sheet pattern), not keywordHierarchy
+        if question.id == 1 {
+            // Return empty array - Question 1 uses Bottom Sheet, not inline keywords
+            return []
+        }
+        
+        // Question 2 uses energyCategories (Bottom Sheet pattern), not keywordHierarchy
+        if question.id == 2 {
+            // Return empty array - Question 2 uses Bottom Sheet, not inline keywords
+            return []
+        }
+        
+        // Question 3 uses praiseCategories (Bottom Sheet pattern), not keywordHierarchy
+        if question.id == 3 {
+            // Return empty array - Question 3 uses Bottom Sheet, not inline keywords
+            return []
+        }
+        
+        // Question 4 uses learningCategories (Bottom Sheet pattern), not keywordHierarchy
+        if question.id == 4 {
+            // Return empty array - Question 4 uses Bottom Sheet, not inline keywords
+            return []
+        }
+        
+        // Question 5 uses fulfillmentCategories (Bottom Sheet pattern), not keywordHierarchy
+        if question.id == 5 {
+            // Return empty array - Question 5 uses Bottom Sheet, not inline keywords
+            return []
+        }
+        
+        // Get first-level keywords (keys of keywordHierarchy) for Questions 2-5
         let firstLevelKeywords = Array(question.keywordHierarchy.keys)
         
         // Get selected first-level keywords

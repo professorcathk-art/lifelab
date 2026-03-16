@@ -23,14 +23,17 @@ struct InitialScanView: View {
                     AISummaryView()
                 case .loading:
                     // Show progress page while AI generates blueprint
-                    if viewModel.isLoadingBlueprint {
-                        // AI is generating - show progress page
+                    // CRITICAL: Only show blueprint generation if user has paid
+                    if viewModel.hasPaid && viewModel.isLoadingBlueprint {
+                        // User has paid AND AI is generating - show progress page
                         BlueprintGenerationProgressView()
-                    } else if viewModel.hasPaid {
-                        // User has paid, waiting for blueprint - show progress page
+                    } else if viewModel.hasPaid && !viewModel.isLoadingBlueprint {
+                        // User has paid but blueprint generation completed - show progress page
+                        // (ContentView will detect blueprint and navigate to MainTabView)
                         BlueprintGenerationProgressView()
                     } else {
-                        // Loading animation BEFORE payment (just animation, no AI)
+                        // User hasn't paid OR payment was cancelled - redirect to payment page
+                        // CRITICAL: Prevent bypass by ensuring payment is required
                         PlanGenerationLoadingView {
                             // After animation completes, show payment page
                             viewModel.currentStep = .payment

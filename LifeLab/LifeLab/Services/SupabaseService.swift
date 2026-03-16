@@ -574,12 +574,70 @@ class SupabaseService: ObservableObject {
         )
     }
     
+    // MARK: - Token Refresh
+    
+    func refreshAccessToken() async throws -> String {
+        guard let refreshToken = UserDefaults.standard.string(forKey: "supabase_refresh_token") else {
+            print("❌ No refresh token available")
+            throw NSError(domain: "SupabaseService", code: -401, userInfo: [NSLocalizedDescriptionKey: "No refresh token available. Please sign in again."])
+        }
+        
+        let urlString = "\(SupabaseConfig.projectURL)/auth/v1/token?grant_type=refresh_token"
+        guard let url = URL(string: urlString) else {
+            throw NSError(domain: "SupabaseService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
+        request.setValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
+        
+        let body: [String: Any] = [
+            "refresh_token": refreshToken
+        ]
+        
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        
+        print("🔄🔄🔄 REFRESHING ACCESS TOKEN 🔄🔄🔄")
+        
+        let (data, response) = try await urlSession.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NSError(domain: "SupabaseService", code: -2, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
+        }
+        
+        guard httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
+            let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
+            print("❌ Token refresh failed: \(errorMessage)")
+            // Clear invalid tokens
+            UserDefaults.standard.removeObject(forKey: "supabase_access_token")
+            UserDefaults.standard.removeObject(forKey: "supabase_refresh_token")
+            throw NSError(domain: "SupabaseService", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "Token refresh failed: \(errorMessage)"])
+        }
+        
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let accessToken = json["access_token"] as? String else {
+            throw NSError(domain: "SupabaseService", code: -3, userInfo: [NSLocalizedDescriptionKey: "Failed to parse refresh response"])
+        }
+        
+        // Save new tokens
+        UserDefaults.standard.set(accessToken, forKey: "supabase_access_token")
+        if let newRefreshToken = json["refresh_token"] as? String {
+            UserDefaults.standard.set(newRefreshToken, forKey: "supabase_refresh_token")
+        }
+        
+        print("✅✅✅ TOKEN REFRESHED SUCCESSFULLY ✅✅✅")
+        return accessToken
+    }
+    
     private func makeRequest(
         endpoint: String,
         method: String,
         body: [String: Any]? = nil,
         queryParams: [String: String]? = nil,
-        retryCount: Int = 3
+        retryCount: Int = 3,
+        shouldRetryOn401: Bool = true
     ) async throws -> [String: Any] {
         var urlString = "\(SupabaseConfig.projectURL)\(endpoint)"
         
@@ -645,6 +703,34 @@ class SupabaseService: ObservableObject {
                 
                 guard (200...299).contains(httpResponse.statusCode) else {
                     let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
+                    
+                    // Handle 401 Unauthorized - try to refresh token
+                    if httpResponse.statusCode == 401 && shouldRetryOn401 {
+                        print("🔒🔒🔒 401 UNAUTHORIZED - ATTEMPTING TOKEN REFRESH 🔒🔒🔒")
+                        do {
+                            _ = try await refreshAccessToken()
+                            // Retry request with new token
+                            print("🔄 Retrying request with refreshed token...")
+                            return try await makeRequest(
+                                endpoint: endpoint,
+                                method: method,
+                                body: body,
+                                queryParams: queryParams,
+                                retryCount: retryCount,
+                                shouldRetryOn401: false // Prevent infinite loop
+                            )
+                        } catch {
+                            print("❌ Token refresh failed: \(error.localizedDescription)")
+                            print("❌❌❌ API ERROR (401 AFTER REFRESH FAILED) ❌❌❌")
+                            print("   Status code: \(httpResponse.statusCode)")
+                            print("   Error message: \(errorMessage)")
+                            // Clear invalid tokens
+                            UserDefaults.standard.removeObject(forKey: "supabase_access_token")
+                            UserDefaults.standard.removeObject(forKey: "supabase_refresh_token")
+                            throw NSError(domain: "SupabaseService", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "Authentication failed. Please sign in again."])
+                        }
+                    }
+                    
                     print("❌❌❌ API ERROR ❌❌❌")
                     print("   Status code: \(httpResponse.statusCode)")
                     print("   Error message: \(errorMessage)")
@@ -772,6 +858,8 @@ class SupabaseService: ObservableObject {
         // Decode from database format
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
+        // CRITICAL: Convert snake_case from database to camelCase for Swift
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
         
         if let jsonData = try? JSONSerialization.data(withJSONObject: dict) {
             return try decoder.decode(UserProfile.self, from: jsonData)
@@ -783,6 +871,9 @@ class SupabaseService: ObservableObject {
     private func encodeUserProfile(_ profile: UserProfile) throws -> [String: Any] {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
+        // CRITICAL: Convert camelCase to snake_case for PostgreSQL compatibility
+        // PostgreSQL converts unquoted identifiers to lowercase, so we use snake_case
+        encoder.keyEncodingStrategy = .convertToSnakeCase
         
         let jsonData = try encoder.encode(profile)
         guard var dict = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any] else {
@@ -794,12 +885,12 @@ class SupabaseService: ObservableObject {
         // If you see "Could not find column" errors, either:
         // 1. Add these columns to database (see SUPABASE_DATABASE_MIGRATION.sql)
         // 2. Or remove them from the dict before sending (current approach)
-        dict.removeValue(forKey: "createdAt")
-        dict.removeValue(forKey: "updatedAt")
+        dict.removeValue(forKey: "created_at")
+        dict.removeValue(forKey: "updated_at")
         
         // CRITICAL: Database schema must match UserProfile model
-        // If you see "Could not find column" errors, run SUPABASE_DATABASE_MIGRATION.sql
-        // This ensures all columns exist in the user_profiles table
+        // Column names are now in snake_case: basic_info, flow_diary_entries, etc.
+        // If you see "Could not find column" errors, ensure table uses snake_case column names
         
         return dict
     }

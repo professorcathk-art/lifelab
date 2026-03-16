@@ -31,7 +31,8 @@ class DataService: ObservableObject {
         }
         return "lifelab_last_sync_time"
     }
-    private let supabaseService = SupabaseService.shared
+    // Use official Supabase SDK
+    private let supabaseService = SupabaseServiceV2.shared
     private let networkMonitor = NWPathMonitor()
     private let monitorQueue = DispatchQueue(label: "NetworkMonitor")
     private var isOnline = true
@@ -202,31 +203,8 @@ class DataService: ObservableObject {
             return
         }
         
-        // IMPORTANT: Check if user has Supabase session
-        // If using local session (e.g., Apple Sign In fallback), skip sync
-        var hasSupabaseSession = UserDefaults.standard.string(forKey: "supabase_access_token") != nil
-        print("   hasSupabaseSession: \(hasSupabaseSession)")
-        print("   userId: \(userId)")
-        print("   isAuthenticated: \(AuthService.shared.isAuthenticated)")
-        
-        if !hasSupabaseSession {
-            print("⚠️ No Supabase session found, attempting to check again...")
-            // Wait a moment and check again (token might still be saving)
-            try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
-            hasSupabaseSession = UserDefaults.standard.string(forKey: "supabase_access_token") != nil
-            print("   hasSupabaseSession (retry): \(hasSupabaseSession)")
-            
-            if !hasSupabaseSession {
-                print("⚠️ No Supabase session found after retry, skipping sync")
-                print("   User is using local session (e.g., Apple Sign In fallback)")
-                print("   Data saved locally but will NOT sync to Supabase")
-                print("   To enable sync:")
-                print("   1. For Email login: Check if token is saved correctly")
-                print("   2. For Apple Sign In: Configure Apple OAuth in Supabase Dashboard")
-                print("   Debug: Check console logs for '🔐 Saving authentication tokens...' message")
-                return
-            }
-        }
+        // Official SDK automatically manages authentication tokens
+        // No need to check UserDefaults - SDK handles it internally
         
         let profileToSync = profile ?? userProfile
         

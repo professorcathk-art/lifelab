@@ -7,6 +7,7 @@ struct BlueprintGenerationProgressView: View {
     @ObservedObject private var themeManager = ThemeManager.shared
     @State private var animatedProgress: Double = 0.0
     @State private var currentStepIndex: Int = 0
+    @State private var progressTask: Task<Void, Never>?
     
     private let steps = [
         "正在分析您的興趣與天賦...",
@@ -118,9 +119,15 @@ struct BlueprintGenerationProgressView: View {
         .onAppear {
             startProgressAnimation()
         }
+        .onDisappear {
+            progressTask?.cancel()
+            progressTask = nil
+        }
         .onChange(of: viewModel.isLoadingBlueprint) { isLoading in
             if !isLoading {
-                // AI generation completed, animate to 100%
+                // AI generation completed, cancel task and animate to 100%
+                progressTask?.cancel()
+                progressTask = nil
                 withAnimation(.easeOut(duration: 0.5)) {
                     animatedProgress = 1.0
                     currentStepIndex = steps.count - 1
@@ -137,29 +144,35 @@ struct BlueprintGenerationProgressView: View {
     }
     
     private func startProgressAnimation() {
-        // Simulate progress based on actual loading state
-        // Update progress based on viewModel.isLoadingBlueprint
-        Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { timer in
-            Task { @MainActor in
+        // Cancel any existing progress task
+        progressTask?.cancel()
+        
+        // Use async Task instead of Timer to avoid Sendable issues
+        progressTask = Task { @MainActor in
+            while !Task.isCancelled && viewModel.isLoadingBlueprint && animatedProgress < 0.9 {
+                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+                
+                if Task.isCancelled {
+                    return
+                }
+                
                 // If still loading, gradually increase progress
                 if viewModel.isLoadingBlueprint {
-                    // Animate progress from 0 to 90% while loading
-                    if animatedProgress < 0.9 {
-                        animatedProgress += 0.01
-                        
-                        // Update step text based on progress
-                        let stepIndex = Int(animatedProgress * Double(steps.count - 1))
-                        if stepIndex != currentStepIndex && stepIndex < steps.count {
-                            currentStepIndex = stepIndex
-                        }
+                    animatedProgress += 0.01
+                    
+                    // Update step text based on progress
+                    let stepIndex = Int(animatedProgress * Double(steps.count - 1))
+                    if stepIndex != currentStepIndex && stepIndex < steps.count {
+                        currentStepIndex = stepIndex
                     }
-                } else {
-                    // Loading completed, animate to 100%
-                    timer.invalidate()
-                    withAnimation(.easeOut(duration: 0.5)) {
-                        animatedProgress = 1.0
-                        currentStepIndex = steps.count - 1
-                    }
+                }
+            }
+            
+            // Loading completed, animate to 100%
+            if !Task.isCancelled {
+                withAnimation(.easeOut(duration: 0.5)) {
+                    animatedProgress = 1.0
+                    currentStepIndex = steps.count - 1
                 }
             }
         }

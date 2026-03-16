@@ -267,7 +267,7 @@ struct SettingsView: View {
         do {
             // Delete user data from Supabase
             if let userId = authService.currentUser?.id {
-                try await SupabaseService.shared.deleteUserData(userId: userId)
+                try await SupabaseServiceV2.shared.deleteUserData(userId: userId)
             }
             
             // Clear local data

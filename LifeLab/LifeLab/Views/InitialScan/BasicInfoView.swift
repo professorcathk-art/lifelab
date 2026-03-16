@@ -7,6 +7,7 @@ struct BasicInfoView: View {
     @State private var ageText: String = ""
     @State private var nameText: String = ""
     @State private var occupationText: String = ""
+    @State private var yearsOfExperienceText: String = ""
     @State private var salaryText: String = ""
     @State private var selectedFamilyStatus: BasicUserInfo.FamilyStatus? = nil
     @State private var selectedEducation: BasicUserInfo.EducationLevel? = nil
@@ -89,6 +90,19 @@ struct BasicInfoView: View {
                                     placeholder: "例如：軟體工程師",
                                     text: $occupationText
                                 )
+                            }
+                            
+                            // Years of Experience Input
+                            ModernFormField(title: "工作年資 *", icon: "clock.fill") {
+                                CustomTextField(
+                                    placeholder: "例如：5",
+                                    text: $yearsOfExperienceText,
+                                    keyboardType: .numberPad
+                                )
+                            } footer: {
+                                Text("請輸入您的工作年資（年）")
+                                    .font(BrandTypography.caption)
+                                    .foregroundColor(BrandColors.tertiaryText)
                             }
                             
                             // Annual Salary (Optional)
@@ -201,6 +215,9 @@ struct BasicInfoView: View {
             if let occupation = viewModel.basicInfo.occupation, !occupation.isEmpty {
                 occupationText = occupation
             }
+            if let yearsOfExperience = viewModel.basicInfo.yearsOfExperience {
+                yearsOfExperienceText = String(yearsOfExperience)
+            }
             if let salary = viewModel.basicInfo.annualSalaryUSD {
                 salaryText = String(salary)
             }
@@ -217,6 +234,9 @@ struct BasicInfoView: View {
             saveBasicInfo()
         }
         .onChange(of: occupationText) { _ in
+            saveBasicInfo()
+        }
+        .onChange(of: yearsOfExperienceText) { _ in
             saveBasicInfo()
         }
         .onChange(of: salaryText) { _ in
@@ -236,6 +256,8 @@ struct BasicInfoView: View {
         Int(ageText) != nil &&
         !nameText.isEmpty &&
         !occupationText.isEmpty &&
+        !yearsOfExperienceText.isEmpty &&
+        Int(yearsOfExperienceText) != nil &&
         selectedFamilyStatus != nil &&
         selectedEducation != nil
     }
@@ -246,6 +268,7 @@ struct BasicInfoView: View {
             age: Int(ageText),
             name: nameText,
             occupation: occupationText,
+            yearsOfExperience: yearsOfExperienceText.isEmpty ? nil : Int(yearsOfExperienceText),
             annualSalaryUSD: salaryText.isEmpty ? nil : Int(salaryText),
             familyStatus: selectedFamilyStatus,
             education: selectedEducation

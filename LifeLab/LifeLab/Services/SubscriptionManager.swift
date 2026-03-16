@@ -14,7 +14,7 @@ class SubscriptionManager: ObservableObject {
     @Published var isCheckingSubscription: Bool = false
     
     private let paymentService = PaymentService.shared
-    private let supabaseService = SupabaseService.shared
+    private let supabaseService = SupabaseServiceV2.shared
     
     private init() {
         // Check subscription status on init
