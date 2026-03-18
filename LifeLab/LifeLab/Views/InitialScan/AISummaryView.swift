@@ -36,17 +36,35 @@ struct AISummaryView: View {
                             Text("這可能需要幾秒鐘時間")
                                 .font(BrandTypography.caption)
                                 .foregroundColor(BrandColors.tertiaryText)
+                            
+                            // Warning banner
+                            HStack(spacing: BrandSpacing.sm) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(BrandColors.warning)
+                                Text("請勿離開此頁面，以免生成中斷")
+                                    .font(BrandTypography.caption)
+                                    .foregroundColor(BrandColors.warning)
+                            }
+                            .padding(.horizontal, BrandSpacing.md)
+                            .padding(.vertical, BrandSpacing.sm)
+                            .background(BrandColors.warning.opacity(0.1))
+                            .cornerRadius(BrandRadius.small)
+                            .padding(.top, BrandSpacing.md)
                         }
                         .padding(.vertical, 60)
                     } else if viewModel.aiSummary.isEmpty {
+                        // Show appropriate error - consent failure shows different message
+                        let errorTitle = viewModel.hasGivenAIConsent ? "無法生成總結" : "請先同意 AI 使用條款"
+                        let errorDetail = viewModel.hasGivenAIConsent ? "請檢查網絡連接或稍後再試" : "請在上一頁勾選同意後繼續"
                         VStack(spacing: BrandSpacing.lg) {
                             Image(systemName: "exclamationmark.triangle")
                                 .font(.system(size: 40))
                                 .foregroundColor(BrandColors.warning)
-                            Text("無法生成總結")
+                            Text(errorTitle)
                                 .font(BrandTypography.headline)
                                 .foregroundColor(BrandColors.primaryText)
-                            Text("請檢查網絡連接或稍後再試")
+                            Text(errorDetail)
                                 .font(BrandTypography.subheadline)
                                 .foregroundColor(BrandColors.secondaryText)
                                 .multilineTextAlignment(.center)

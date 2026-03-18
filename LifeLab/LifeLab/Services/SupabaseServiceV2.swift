@@ -17,6 +17,9 @@ class SupabaseServiceV2 {
             fatalError("❌ Invalid Supabase configuration. URL: \(url), Key: \(anonKey.prefix(20))...")
         }
         
+        // Initialize Supabase client with default configuration
+        // Note: The SDK warning about initial session emission is expected behavior
+        // and will be fixed in the next major release. Our code handles session checks properly.
         self.client = SupabaseClient(
             supabaseURL: supabaseURL,
             supabaseKey: anonKey
@@ -57,20 +60,38 @@ class SupabaseServiceV2 {
     }
     
     func signIn(email: String, password: String) async throws -> AuthResponse {
-        let session = try await client.auth.signIn(
-            email: email,
-            password: password
-        )
-        
-        return AuthResponse(
-            accessToken: session.accessToken,
-            refreshToken: session.refreshToken,
-            user: AuthUser(
-                id: session.user.id.uuidString,
-                email: session.user.email,
-                name: nil
+        do {
+            let session = try await client.auth.signIn(
+                email: email,
+                password: password
             )
-        )
+            return AuthResponse(
+                accessToken: session.accessToken,
+                refreshToken: session.refreshToken,
+                user: AuthUser(
+                    id: session.user.id.uuidString,
+                    email: session.user.email,
+                    name: nil
+                )
+            )
+        } catch {
+            let msg = error.localizedDescription.lowercased()
+            let underlying = (error as NSError).userInfo[NSUnderlyingErrorKey] as? NSError
+            let underlyingMsg = underlying?.localizedDescription.lowercased() ?? ""
+            let full = msg + " " + underlyingMsg
+            if full.contains("invalid login credentials") || full.contains("invalid_grant") ||
+               full.contains("user not found") || full.contains("invalid_credentials") {
+                throw NSError(
+                    domain: "SupabaseService",
+                    code: 401,
+                    userInfo: [
+                        NSLocalizedDescriptionKey: "Invalid login credentials",
+                        "shouldShowSignUp": true
+                    ]
+                )
+            }
+            throw error
+        }
     }
     
     func signOut() async throws {
@@ -84,10 +105,15 @@ class SupabaseServiceV2 {
             let user = session.user
             
             // Extract name from userMetadata
+            // userMetadata is [String: AnyJSON], access values directly
             var name: String? = nil
-            if let metadata = user.userMetadata as? [String: Any],
-               let userName = metadata["name"] as? String {
-                name = userName
+            if let nameValue = user.userMetadata["name"] {
+                // AnyJSON can be accessed via stringValue property or pattern matching
+                if case .string(let userName) = nameValue {
+                    name = userName
+                } else if let userName = nameValue.stringValue {
+                    name = userName
+                }
             }
             
             return AuthUser(
@@ -113,10 +139,15 @@ class SupabaseServiceV2 {
             let user = session.user
             
             // Extract name from userMetadata
+            // userMetadata is [String: AnyJSON], access values directly
             var name: String? = nil
-            if let metadata = user.userMetadata as? [String: Any],
-               let userName = metadata["name"] as? String {
-                name = userName
+            if let nameValue = user.userMetadata["name"] {
+                // AnyJSON can be accessed via stringValue property or pattern matching
+                if case .string(let userName) = nameValue {
+                    name = userName
+                } else if let userName = nameValue.stringValue {
+                    name = userName
+                }
             }
             
             return AuthResponse(
@@ -149,6 +180,106 @@ class SupabaseServiceV2 {
             )
         }
         try await client.auth.resetPasswordForEmail(email, redirectTo: redirectTo)
+    }
+    
+    // MARK: - Email OTP Authentication
+    
+    /// Register OTP - Step 1: Send OTP to email
+    /// Uses signUp (not signInWithOTP) to trigger Confirm signup template.
+    /// signInWithOTP always uses Magic Link template; signUp uses Confirm signup template.
+    /// We pass a temporary password; user sets real password after OTP verification.
+    func sendSignUpOTP(email: String, name: String? = nil) async throws {
+        let tempPassword = UUID().uuidString + "A1!" // Temporary; replaced after OTP verify
+        var data: [String: AnyJSON] = [:]
+        if let name = name, !name.isEmpty {
+            data["name"] = .string(name)
+        }
+        do {
+            _ = try await client.auth.signUp(
+                email: email,
+                password: tempPassword,
+                data: data
+            )
+        } catch {
+            let msg = error.localizedDescription.lowercased()
+            if msg.contains("user already registered") || msg.contains("email already exists") ||
+               msg.contains("already registered") {
+                throw NSError(
+                    domain: "SupabaseService",
+                    code: 422,
+                    userInfo: [
+                        NSLocalizedDescriptionKey: "此電子郵件已被註冊，請使用登錄。",
+                        "userAlreadyExists": true
+                    ]
+                )
+            }
+            throw error
+        }
+    }
+    
+    /// Forgot password OTP - Step 1: Send recovery OTP to email
+    /// Uses resetPasswordForEmail; template must include {{ .Token }} for OTP display
+    func sendRecoveryOTP(email: String) async throws {
+        guard let redirectTo = URL(string: "lifelab://reset-password") else {
+            throw NSError(domain: "SupabaseService", code: -6, userInfo: [NSLocalizedDescriptionKey: "Invalid redirect URL"])
+        }
+        try await client.auth.resetPasswordForEmail(email, redirectTo: redirectTo)
+    }
+    
+    /// Register OTP - Step 2: Verify OTP and set password
+    /// verifyOTP with .signup establishes session, then updateUser sets password
+    func verifySignUpOTP(email: String, token: String, password: String, name: String? = nil) async throws -> AuthResponse {
+        let response = try await client.auth.verifyOTP(
+            email: email,
+            token: token,
+            type: .signup
+        )
+        guard let session = response.session else {
+            throw NSError(domain: "SupabaseService", code: -7, userInfo: [NSLocalizedDescriptionKey: "OTP verification failed - no session"])
+        }
+        // Set password and name for the new user
+        if !password.isEmpty {
+            _ = try await client.auth.update(user: UserAttributes(password: password))
+        }
+        if let name = name, !name.isEmpty {
+            _ = try await client.auth.update(user: UserAttributes(data: ["name": .string(name)]))
+        }
+        var userName: String? = name
+        if userName == nil, let nameValue = session.user.userMetadata["name"] {
+            if case .string(let n) = nameValue { userName = n } else { userName = nameValue.stringValue }
+        }
+        return AuthResponse(
+            accessToken: session.accessToken,
+            refreshToken: session.refreshToken,
+            user: AuthUser(
+                id: session.user.id.uuidString,
+                email: session.user.email ?? email,
+                name: userName
+            )
+        )
+    }
+    
+    /// Forgot password OTP - Step 2: Verify OTP and set new password
+    /// verifyOTP with .recovery establishes session, then updateUser sets password
+    func verifyRecoveryOTP(email: String, token: String, newPassword: String) async throws -> AuthResponse {
+        let response = try await client.auth.verifyOTP(
+            email: email,
+            token: token,
+            type: .recovery
+        )
+        guard let session = response.session else {
+            throw NSError(domain: "SupabaseService", code: -8, userInfo: [NSLocalizedDescriptionKey: "Recovery OTP verification failed - no session"])
+        }
+        _ = try await client.auth.update(user: UserAttributes(password: newPassword))
+        return AuthResponse(
+            accessToken: session.accessToken,
+            refreshToken: session.refreshToken,
+            user: AuthUser(
+                id: session.user.id.uuidString,
+                email: session.user.email ?? email,
+                name: nil
+            )
+        )
     }
     
     // MARK: - User Profile Operations
@@ -229,7 +360,7 @@ class SupabaseServiceV2 {
         
         // Verify save
         print("🔍 Verifying profile was saved...")
-        if let verified = try? await fetchUserProfile(userId: userId), verified != nil {
+        if (try? await fetchUserProfile(userId: userId)) != nil {
             print("✅ Verification successful: Profile exists in Supabase")
         } else {
             print("⚠️ Verification warning: Profile not found immediately after save")

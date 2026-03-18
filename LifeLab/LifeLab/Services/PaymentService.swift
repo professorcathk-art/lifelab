@@ -25,6 +25,26 @@ class PaymentService: ObservableObject {
         Task {
             await loadPurchasedProducts()
         }
+        
+        // CRITICAL: Listen for transaction updates to catch successful purchases
+        // This prevents missing purchases if app is closed during purchase
+        Task {
+            for await update in Transaction.updates {
+                do {
+                    let transaction = try checkVerified(update)
+                    print("✅ Transaction update received: \(transaction.productID)")
+                    await updatePurchasedProducts()
+                    await saveSubscriptionToSupabase(
+                        productID: transaction.productID,
+                        transactionID: String(transaction.id),
+                        purchaseDate: transaction.purchaseDate
+                    )
+                    await transaction.finish()
+                } catch {
+                    print("⚠️ Failed to process transaction update: \(error.localizedDescription)")
+                }
+            }
+        }
     }
     
     /// Load available products from App Store

@@ -15,8 +15,11 @@ class AuthService: ObservableObject {
     private let supabaseService = SupabaseServiceV2.shared
     
     private init() {
-        loadUser()
-        // Check if we have a valid Supabase session
+        // CRITICAL: Don't set isAuthenticated from local storage alone
+        // Only checkSupabaseSession() should set authentication state
+        // This ensures we verify with Supabase before showing main app
+        loadUserForCache() // Load user info for reference, but don't authenticate yet
+        // Check if we have a valid Supabase session (this will set isAuthenticated if valid)
         checkSupabaseSession()
     }
     
@@ -125,6 +128,59 @@ class AuthService: ObservableObject {
         } catch {
             print("❌ Email sign in error: \(error.localizedDescription)")
             throw error
+        }
+    }
+    
+    /// Complete OTP sign-up (after verifyOTP) - sets session and loads data
+    func completeOTPSignUp(response: AuthResponse) async throws {
+        let supabaseUser = response.user
+        let user = User(
+            id: supabaseUser.id,
+            email: supabaseUser.email,
+            name: supabaseUser.name,
+            authProvider: .email
+        )
+        await MainActor.run {
+            DataService.shared.userProfile = nil
+            DataService.shared.lastSyncTime = nil
+            self.currentUser = user
+            self.isAuthenticated = true
+            saveUser(user)
+            if UserDefaults.standard.bool(forKey: "lifelab_ai_consent_pending") {
+                let consentKey = "lifelab_ai_consent_\(supabaseUser.id)"
+                UserDefaults.standard.set(true, forKey: consentKey)
+                UserDefaults.standard.removeObject(forKey: "lifelab_ai_consent_pending")
+            }
+        }
+        await MainActor.run {
+            DataService.shared.loadUserProfileForUser(userId: supabaseUser.id)
+        }
+        Task {
+            await DataService.shared.createUserProfileInSupabase(userId: supabaseUser.id)
+        }
+    }
+    
+    /// Complete OTP sign-in (e.g. after recovery verifyOTP) - sets session and loads data
+    func completeOTPSignIn(response: AuthResponse) async throws {
+        let supabaseUser = response.user
+        let user = User(
+            id: supabaseUser.id,
+            email: supabaseUser.email,
+            name: supabaseUser.name,
+            authProvider: .email
+        )
+        await MainActor.run {
+            DataService.shared.userProfile = nil
+            DataService.shared.lastSyncTime = nil
+            self.currentUser = user
+            self.isAuthenticated = true
+            saveUser(user)
+        }
+        await MainActor.run {
+            DataService.shared.loadUserProfileForUser(userId: supabaseUser.id)
+        }
+        Task {
+            await DataService.shared.loadFromSupabase(userId: supabaseUser.id)
         }
     }
     
@@ -419,6 +475,28 @@ class AuthService: ObservableObject {
         // Check if we have a valid Supabase session (async call)
         Task {
             do {
+                // CRITICAL: On first launch after app REINSTALL (not update), sign out to clear stale Keychain
+                // Keychain can persist across app reinstalls. We detect reinstall by: no local user data.
+                // App update: UserDefaults persists so we'd have userDefaultsKey. Reinstall: both cleared.
+                if !UserDefaults.standard.bool(forKey: "lifelab_has_launched_before") {
+                    UserDefaults.standard.set(true, forKey: "lifelab_has_launched_before")
+                    let hasLocalUser = UserDefaults.standard.data(forKey: self.userDefaultsKey) != nil
+                    if !hasLocalUser, let _ = try? await supabaseService.getCurrentUser() {
+                        // No local data but have Keychain session = reinstall, clear it
+                        try? await supabaseService.signOut()
+                        await MainActor.run {
+                            self.isAuthenticated = false
+                            self.currentUser = nil
+                        }
+                        print("📱 First launch after reinstall - cleared stale Keychain session (user must login again)")
+                        return
+                    }
+                    if !hasLocalUser {
+                        return // Fresh install, no session to restore
+                    }
+                    // Has local user = app update, continue with normal session restore
+                }
+                
                 if let supabaseUser = try await supabaseService.getCurrentUser() {
                     print("✅ Found Supabase session for user: \(supabaseUser.id)")
                     
@@ -443,11 +521,15 @@ class AuthService: ObservableObject {
                     print("✅ Completed loading profile from Supabase")
                 } else {
                     print("⚠️ No Supabase session found (user needs to login)")
-                    // Check if we have local user data (from previous session)
+                    // CRITICAL: Clear authentication state if no valid Supabase session
                     await MainActor.run {
                         if self.currentUser != nil {
-                            print("📱 Found local user data, but no Supabase session. User needs to login again.")
+                            print("📱 Found local user data, but no Supabase session. Clearing authentication state.")
+                            print("   User needs to login again.")
                         }
+                        // Clear authentication state - user must login again
+                        self.isAuthenticated = false
+                        self.currentUser = nil
                     }
                 }
             } catch {
@@ -464,11 +546,16 @@ class AuthService: ObservableObject {
         }
     }
     
-    private func loadUser() {
+    /// Load user from local cache (for reference only, doesn't set authentication state)
+    /// Authentication state should only be set by checkSupabaseSession() after verifying with Supabase
+    private func loadUserForCache() {
         if let data = UserDefaults.standard.data(forKey: userDefaultsKey),
            let user = try? JSONDecoder().decode(User.self, from: data) {
+            // Only set currentUser, NOT isAuthenticated
+            // isAuthenticated will be set by checkSupabaseSession() if Supabase session is valid
             self.currentUser = user
-            self.isAuthenticated = true
+            print("📱 Loaded cached user from local storage: \(user.id)")
+            print("   Waiting for Supabase session verification before authenticating...")
         }
     }
 }

@@ -1,6 +1,6 @@
 import Foundation
 
-struct UserProfile: Codable, Identifiable {
+struct UserProfile: Codable, Identifiable, Equatable {
     let id: UUID
     var basicInfo: BasicUserInfo? // New: Basic user information
     var interests: [String]
@@ -108,7 +108,7 @@ enum CoreValue: String, Codable, CaseIterable {
     }
 }
 
-struct FlowDiaryEntry: Codable, Identifiable {
+struct FlowDiaryEntry: Codable, Identifiable, Equatable {
     let id: UUID
     var date: Date
     var activity: String
@@ -124,7 +124,7 @@ struct FlowDiaryEntry: Codable, Identifiable {
     }
 }
 
-struct ValuesQuestions: Codable {
+struct ValuesQuestions: Codable, Equatable {
     var admiredPeople: String?
     var favoriteCharacters: String?
     var idealChild: String?
@@ -140,7 +140,7 @@ struct ValuesQuestions: Codable {
     }
 }
 
-struct ReflectionAnswer: Codable, Identifiable {
+struct ReflectionAnswer: Codable, Identifiable, Equatable {
     let id: UUID
     let questionId: Int
     let question: String
@@ -154,21 +154,21 @@ struct ReflectionAnswer: Codable, Identifiable {
     }
 }
 
-struct ResourceInventory: Codable {
+struct ResourceInventory: Codable, Equatable {
     var time: String?
     var money: String?
     var items: String?
     var network: String?
 }
 
-struct AcquiredStrengths: Codable {
+struct AcquiredStrengths: Codable, Equatable {
     var experience: String?
     var knowledge: String?
     var skills: String?
     var achievements: String?
 }
 
-struct FeasibilityAssessment: Codable {
+struct FeasibilityAssessment: Codable, Equatable {
     var path1: String?
     var path2: String?
     var path3: String?
@@ -211,7 +211,7 @@ struct VocationDirection: Codable, Identifiable, Equatable {
     }
 }
 
-struct ActionPlan: Codable {
+struct ActionPlan: Codable, Equatable {
     var shortTerm: [ActionItem]
     var midTerm: [ActionItem]
     var longTerm: [ActionItem]
@@ -229,7 +229,7 @@ struct ActionPlan: Codable {
     }
 }
 
-struct ActionItem: Codable, Identifiable {
+struct ActionItem: Codable, Identifiable, Equatable {
     let id: UUID
     var title: String
     var description: String
@@ -245,7 +245,7 @@ struct ActionItem: Codable, Identifiable {
     }
 }
 
-struct Milestone: Codable, Identifiable {
+struct Milestone: Codable, Identifiable, Equatable {
     let id: UUID
     var title: String
     var description: String

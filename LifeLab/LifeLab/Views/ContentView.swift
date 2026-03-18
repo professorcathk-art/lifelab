@@ -81,67 +81,22 @@ struct ContentView: View {
                         .environmentObject(viewModel)
                         .environmentObject(themeManager)
                         .onAppear {
-                            if let profile = dataService.userProfile {
-                                viewModel.basicInfo = profile.basicInfo ?? BasicUserInfo()
-                                viewModel.selectedInterests = profile.interests
-                                viewModel.strengths = profile.strengths
-                                viewModel.selectedValues = profile.values
-                                
-                                // Restore state based on completion progress
-                                // Priority: blueprint > payment > aiSummary > values > strengths > interests > basicInfo
-                                if profile.lifeBlueprint != nil {
-                                    // User has completed everything - ContentView will show MainTabView
-                                    // Don't set currentStep here - ContentView handles navigation
-                                    viewModel.lifeBlueprint = profile.lifeBlueprint
-                                    print("✅ ContentView: User has blueprint, will show MainTabView")
-                                } else if !profile.values.isEmpty {
-                                    // User completed questionnaire - determine where they should be
-                                    // Reload consent status (in case user just logged in)
-                                    viewModel.loadAIConsentStatus()
-                                    
-                                    // CRITICAL: Check if user has given AI consent first
-                                    if viewModel.hasGivenAIConsent {
-                                        // User has given consent (from login page), check subscription status
-                                        Task {
-                                            await subscriptionManager.checkSubscriptionStatus()
-                                            await paymentService.refreshPurchasedProducts()
-                                            
-                                            let hasActiveSubscription = subscriptionManager.hasActiveSubscription
-                                            
-                                            await MainActor.run {
-                                                if hasActiveSubscription {
-                                                    print("✅✅✅ User has VALID subscription (StoreKit + Supabase), skipping payment and generating blueprint")
-                                                    viewModel.hasPaid = true
-                                                    viewModel.generateLifeBlueprint()
-                                                    viewModel.currentStep = .loading
-                                                } else {
-                                                    print("❌❌❌ User has NO valid subscription, showing payment page")
-                                                    viewModel.currentStep = .payment
-                                                }
-                                            }
-                                        }
-                                        viewModel.currentStep = .loading
-                                    } else {
-                                        // User hasn't given consent yet (shouldn't happen if login flow is correct)
-                                        // Fallback: show consent screen
-                                        print("⚠️ User has not given AI consent, showing consent screen")
-                                        viewModel.currentStep = .aiConsent
-                                    }
-                                } else if !profile.strengths.isEmpty {
-                                    viewModel.currentStep = .values
-                                } else if !profile.interests.isEmpty {
-                                    viewModel.currentStep = .strengths
-                                } else if profile.basicInfo != nil {
-                                    viewModel.currentStep = .interests
-                                } else {
-                                    viewModel.currentStep = .basicInfo
-                                }
-                            } else {
-                                // No profile exists - reset to first page (basicInfo)
-                                // This happens when user clears all data
-                                viewModel.resetInitialScan()
-                                viewModel.loadAIConsentStatus() // Reload consent status (should be false after clear)
-                                print("✅ ContentView: No profile found, resetting to initial scan (basicInfo)")
+                            // CRITICAL: Wait for data to load if authenticated
+                            // This handles the case where data is loading from Supabase
+                            if AuthService.shared.isAuthenticated && dataService.userProfile == nil {
+                                print("⏳ ContentView: Waiting for profile to load from Supabase...")
+                                // Data is loading, wait for onChange to handle it
+                                return
+                            }
+                            
+                            restoreProfileState()
+                        }
+                        .onChange(of: dataService.userProfile) { profile in
+                            // CRITICAL: React when profile is loaded from Supabase
+                            // This ensures we restore state even if onAppear ran before data loaded
+                            if profile != nil {
+                                print("✅ ContentView: Profile loaded, restoring state...")
+                                restoreProfileState()
                             }
                         }
                 }
@@ -172,6 +127,109 @@ struct ContentView: View {
             Button("稍後", role: .cancel) { }
         } message: {
             Text("您的訂閱已過期，請續訂以繼續使用 LifeLab 的所有功能。")
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
+    /// Restore profile state in InitialScanView based on completion progress
+    private func restoreProfileState() {
+        guard let profile = dataService.userProfile else {
+            // No profile exists - reset to first page (basicInfo)
+            // This happens when user clears all data or is a new user
+            viewModel.resetInitialScan()
+            viewModel.loadAIConsentStatus() // Reload consent status (should be false after clear)
+            print("✅ ContentView: No profile found, resetting to initial scan (basicInfo)")
+            return
+        }
+        
+        // Reload consent status (may have changed, e.g. after login)
+        viewModel.loadAIConsentStatus()
+        
+        print("🔍🔍🔍 restoreProfileState() called 🔍🔍🔍")
+        print("   Profile has:")
+        print("     - Interests: \(profile.interests.count)")
+        print("     - Strengths: \(profile.strengths.count)")
+        print("     - Values: \(profile.values.count)")
+        print("     - lifeBlueprint: \(profile.lifeBlueprint != nil ? "YES ✅" : "NO ❌")")
+        print("     - hasGivenAIConsent: \(viewModel.hasGivenAIConsent)")
+        print("     - hasCompletedInitialScan: \(hasCompletedInitialScan)")
+        
+        // CRITICAL: Check if user has blueprint FIRST - if yes, skip all restoration logic
+        // ContentView's hasCompletedInitialScan will automatically show MainTabView
+        if profile.lifeBlueprint != nil {
+            // User has completed everything - ContentView will show MainTabView
+            // Don't set currentStep or restore any state - ContentView handles navigation automatically
+            viewModel.lifeBlueprint = profile.lifeBlueprint
+            print("✅✅✅ ContentView: User HAS blueprint - ContentView will show MainTabView automatically")
+            print("   hasCompletedInitialScan = \(hasCompletedInitialScan)")
+            print("   ⚠️ SKIPPING all restoration logic - user should see MainTabView, not InitialScanView")
+            // CRITICAL: Don't restore form data or set currentStep - just return
+            // This ensures user goes directly to MainTabView without seeing any questionnaire pages
+            return
+        }
+        
+        // Only restore form data if user doesn't have blueprint
+        viewModel.basicInfo = profile.basicInfo ?? BasicUserInfo()
+        viewModel.selectedInterests = profile.interests
+        viewModel.strengths = profile.strengths
+        viewModel.selectedValues = profile.values
+        
+        // Restore state based on completion progress
+        // Priority: blueprint > aiConsent > aiSummary > payment > values > strengths > interests > basicInfo
+        print("   No blueprint found, restoring to appropriate step...")
+        if !profile.values.isEmpty {
+            // User completed questionnaire
+            // CRITICAL: Check AI consent FIRST - user must consent before we can generate AI summary
+            // Flow: values → aiConsent (if no consent) → aiSummary → payment → blueprint
+            if !viewModel.hasGivenAIConsent {
+                // User hasn't given AI consent - show consent page first
+                print("   📋 AI consent not given, showing AI consent page")
+                viewModel.currentStep = .aiConsent
+            } else if viewModel.aiSummary.isEmpty {
+                // AI summary not generated yet, show AI summary page and generate
+                print("   📋 AI summary not found, showing AI summary page")
+                viewModel.currentStep = .aiSummary
+                viewModel.generateAISummary()
+            } else {
+                // AI summary already exists, check if user has paid/generated blueprint
+                print("   📋 AI summary exists, checking next step...")
+                // Check subscription status to determine if should show payment or can generate blueprint
+                Task {
+                    await subscriptionManager.checkSubscriptionStatus()
+                    await paymentService.refreshPurchasedProducts()
+                    
+                    let hasActiveSubscription = subscriptionManager.hasActiveSubscription
+                    
+                    await MainActor.run {
+                        if hasActiveSubscription {
+                            print("✅✅✅ User has VALID subscription (StoreKit + Supabase), skipping payment and generating blueprint")
+                            viewModel.hasPaid = true
+                            // CRITICAL: Only generate if blueprint doesn't exist
+                            if profile.lifeBlueprint == nil {
+                                viewModel.generateLifeBlueprint()
+                                viewModel.currentStep = .loading
+                            } else {
+                                // Blueprint already exists, just show it
+                                viewModel.lifeBlueprint = profile.lifeBlueprint
+                                viewModel.currentStep = .blueprint
+                            }
+                        } else {
+                            print("❌❌❌ User has NO valid subscription, showing payment page")
+                            viewModel.currentStep = .payment
+                        }
+                    }
+                }
+                viewModel.currentStep = .loading
+            }
+        } else if !profile.strengths.isEmpty {
+            viewModel.currentStep = .values
+        } else if !profile.interests.isEmpty {
+            viewModel.currentStep = .strengths
+        } else if profile.basicInfo != nil {
+            viewModel.currentStep = .interests
+        } else {
+            viewModel.currentStep = .basicInfo
         }
     }
     

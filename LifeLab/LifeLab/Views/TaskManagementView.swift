@@ -156,7 +156,23 @@ struct TaskManagementView: View {
                 .progressViewStyle(CircularProgressViewStyle(tint: BrandColors.actionAccent))
                 .scaleEffect(1.2)
             
-            Text("行動計劃生成中")
+            VStack(spacing: BrandSpacing.sm) {
+                Text("行動計劃生成中")
+                
+                // Warning banner
+                HStack(spacing: BrandSpacing.sm) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(BrandColors.warning)
+                    Text("請勿離開此頁面，以免生成中斷")
+                        .font(BrandTypography.caption)
+                        .foregroundColor(BrandColors.warning)
+                }
+                .padding(.horizontal, BrandSpacing.sm)
+                .padding(.vertical, BrandSpacing.xs)
+                .background(BrandColors.warning.opacity(0.1))
+                .cornerRadius(BrandRadius.small)
+            }
                 .font(BrandTypography.title2)
                 .fontWeight(.semibold)
                 .foregroundColor(BrandColors.primaryText)

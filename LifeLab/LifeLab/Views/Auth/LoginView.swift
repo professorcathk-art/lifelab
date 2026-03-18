@@ -12,9 +12,11 @@ struct LoginView: View {
     @State private var errorMessage = ""
     @State private var isLoading = false
     @State private var showForgotPassword = false
+    @State private var showForgotPasswordOTP = false
     @State private var forgotPasswordEmail = ""
     @State private var isResettingPassword = false
     @State private var showResetSuccess = false
+    @State private var showRegisterOTP = false
     @State private var hasReadTerms = false
     @State private var showPrivacyPolicy = false
     
@@ -41,7 +43,7 @@ struct LoginView: View {
                         }
                         .buttonStyle(.plain)
                     }
-                    .padding(.horizontal, BrandSpacing.xl)
+                    .padding(.horizontal, ResponsiveLayout.horizontalPadding())
                     .padding(.top, BrandSpacing.lg)
                     
                     // Hero Section - Welcome Block
@@ -124,18 +126,20 @@ struct LoginView: View {
                             keyboardType: .emailAddress
                         )
                         
-                        // Password field
-                        ModernSecureField(
-                            title: "密碼",
-                            icon: "lock.fill",
-                            text: $password,
-                            placeholder: "請輸入密碼"
-                        )
+                        // Password field (only for sign in - sign up uses OTP flow)
+                        if !isSignUp {
+                            ModernSecureField(
+                                title: "密碼",
+                                icon: "lock.fill",
+                                text: $password,
+                                placeholder: "請輸入密碼"
+                            )
+                        }
                         
-                        // Forgot password (only for sign in)
+                        // Forgot password (only for sign in) - opens OTP flow
                         if !isSignUp {
                             Button(action: {
-                                showForgotPassword = true
+                                showForgotPasswordOTP = true
                             }) {
                                 HStack {
                                     Spacer()
@@ -153,7 +157,7 @@ struct LoginView: View {
                             hasReadTerms: $hasReadTerms,
                             showPrivacyPolicy: $showPrivacyPolicy
                         )
-                        .padding(.horizontal, BrandSpacing.xl)
+                        .padding(.horizontal, ResponsiveLayout.horizontalPadding())
                         .padding(.top, BrandSpacing.md)
                         
                         // Submit button - CTA Button
@@ -182,20 +186,20 @@ struct LoginView: View {
                                 // CRITICAL: Ensure proper contrast in both modes
                                 // Dark mode: White background → Black text
                                 // Light mode: Purple background → White text
-                                (isLoading || email.isEmpty || password.isEmpty || (isSignUp && name.isEmpty) || !hasReadTerms)
+                                (isLoading || email.isEmpty || (isSignUp ? name.isEmpty : password.isEmpty) || !hasReadTerms)
                                     ? (themeManager.isDarkMode ? Color(hex: "9CA3AF") : Color(hex: "8E8E93")) // Disabled: Muted gray text
                                     : (themeManager.isDarkMode ? Color.black : Color.white) // Enabled: Black (dark) or White (light)
                             )
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, BrandSpacing.md)
                             .background(
-                                (isLoading || email.isEmpty || password.isEmpty || (isSignUp && name.isEmpty) || !hasReadTerms)
+                                (isLoading || email.isEmpty || (isSignUp ? name.isEmpty : password.isEmpty) || !hasReadTerms)
                                     ? (themeManager.isDarkMode ? Color(hex: "333333") : Color(hex: "E2DDFF")) // Disabled: Dark gray (dark) or Light purple-gray (day)
                                     : (themeManager.isDarkMode ? Color.white : BrandColors.actionAccent) // Enabled: White (dark) or Purple (day)
                             )
                             .clipShape(Capsule())
                             .shadow(
-                                color: (isLoading || email.isEmpty || password.isEmpty || (isSignUp && name.isEmpty)) 
+                                color: (isLoading || email.isEmpty || (isSignUp ? name.isEmpty : password.isEmpty) || !hasReadTerms)
                                     ? Color.clear 
                                     : BrandColors.buttonShadow.color,
                                 radius: BrandColors.buttonShadow.radius,
@@ -204,8 +208,8 @@ struct LoginView: View {
                             )
                         }
                         .buttonStyle(.plain)
-                        .disabled(isLoading || email.isEmpty || password.isEmpty || (isSignUp && name.isEmpty))
-                        .padding(.horizontal, BrandSpacing.xl)
+                        .disabled(isLoading || email.isEmpty || (isSignUp ? name.isEmpty : password.isEmpty) || !hasReadTerms)
+                        .padding(.horizontal, ResponsiveLayout.horizontalPadding())
                         
                         // Toggle sign up/sign in
                         Button(action: {
@@ -264,10 +268,12 @@ struct LoginView: View {
                             x: themeManager.isDarkMode ? 0 : BrandColors.cardShadow.x,
                             y: themeManager.isDarkMode ? 0 : BrandColors.cardShadow.y
                         )
-                        .padding(.horizontal, BrandSpacing.xl)
+                        .padding(.horizontal, ResponsiveLayout.horizontalPadding())
                     }
                     .padding(.bottom, BrandSpacing.xxxl)
                 }
+                .frame(maxWidth: ResponsiveLayout.maxContentWidth())
+                .frame(maxWidth: .infinity)
             }
         }
         .preferredColorScheme(themeManager.isDarkMode ? .dark : .light)
@@ -276,6 +282,26 @@ struct LoginView: View {
         } message: {
             Text(errorMessage)
                 .font(BrandTypography.body)
+        }
+        .sheet(isPresented: $showForgotPasswordOTP) {
+            OTPAuthView(flowType: .forgotPassword)
+                .environmentObject(authService)
+                .environmentObject(themeManager)
+        }
+        .sheet(isPresented: $showRegisterOTP) {
+            OTPAuthView(
+                flowType: .register,
+                initialEmail: email,
+                initialName: name,
+                onUserAlreadyExists: {
+                    showRegisterOTP = false
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        isSignUp = false
+                    }
+                }
+            )
+            .environmentObject(authService)
+            .environmentObject(themeManager)
         }
         .alert("忘記密碼", isPresented: $showForgotPassword) {
             TextField("電子郵件", text: $forgotPasswordEmail)
@@ -348,15 +374,15 @@ struct LoginView: View {
         isLoading = true
         do {
             if isSignUp {
-                try await authService.signUpWithEmail(email: email, password: password, name: name)
-                // After successful signup, save consent with actual user ID
-                if let userId = authService.currentUser?.id {
-                    let consentKey = "lifelab_ai_consent_\(userId)"
-                    UserDefaults.standard.set(true, forKey: consentKey)
-                    UserDefaults.standard.removeObject(forKey: "lifelab_ai_consent_pending")
+                // Sign up uses OTP flow - open OTPAuthView sheet with pre-filled name/email
+                await MainActor.run {
+                    isLoading = false
+                    showRegisterOTP = true
                 }
+                return
             } else {
                 try await authService.signInWithEmail(email: email, password: password)
+                await MainActor.run { isLoading = false }
                 // After successful signin, save consent with actual user ID
                 if let userId = authService.currentUser?.id {
                     let consentKey = "lifelab_ai_consent_\(userId)"
@@ -367,10 +393,14 @@ struct LoginView: View {
         } catch {
             await MainActor.run {
                 let nsError = error as NSError
+                let errorMsg = error.localizedDescription.lowercased()
+                
+                // NOTE: Do NOT auto-switch to sign up on sign-in failure. Supabase returns
+                // "Invalid login credentials" for BOTH "user not found" AND "wrong password" -
+                // we cannot distinguish. Auto-switching misleads users who have an account.
                 
                 // Professional error message handling
                 if nsError.domain == "SupabaseService" {
-                    let errorMsg = nsError.localizedDescription.lowercased()
                     let statusCode = nsError.code
                     
                     if isSignUp {
@@ -399,20 +429,13 @@ struct LoginView: View {
                             showError = true
                         }
                     } else {
-                        // Sign in errors
-                        if errorMsg.contains("invalid login credentials") ||
-                           errorMsg.contains("user not found") ||
-                           errorMsg.contains("email not confirmed") ||
-                           statusCode == 401 ||
-                           nsError.userInfo["shouldShowSignUp"] != nil {
-                            // Wrong password or user doesn't exist
-                            errorMessage = "電子郵件或密碼不正確。\n\n請檢查：\n• 電子郵件地址是否正確\n• 密碼是否正確（注意大小寫）\n• 是否已註冊帳號\n\n如果忘記密碼，請使用「忘記密碼？」功能。"
-                            showError = true
-                        } else {
-                            // Generic sign in error
-                            errorMessage = "登錄失敗。\n\n\(nsError.localizedDescription)\n\n請稍後再試，或聯繫客服尋求協助。"
-                            showError = true
-                        }
+                        // Sign in errors - credential failure (wrong password or user not found)
+                        let isCredentialError = errorMsg.contains("invalid login credentials") ||
+                            errorMsg.contains("invalid_grant") || nsError.code == 401
+                        errorMessage = isCredentialError
+                            ? "電子郵件或密碼不正確。\n\n若尚未註冊，請先註冊；若忘記密碼，請使用「忘記密碼？」。"
+                            : "登錄失敗。\n\n\(nsError.localizedDescription)\n\n請稍後再試，或聯繫客服尋求協助。"
+                        showError = true
                     }
                 } else if nsError.domain == NSURLErrorDomain {
                     // Network error - professional message
@@ -441,8 +464,12 @@ struct LoginView: View {
                     errorMessage = "網絡連接出現問題。\n\nA TLS error caused the secure connection to fail.\n\n請檢查您的網絡連接後再試。"
                     showError = true
                 } else {
-                    // Generic error - professional message
-                    errorMessage = "發生錯誤。\n\n\(error.localizedDescription)\n\n請稍後再試，如問題持續存在，請聯繫客服。"
+                    // Generic error (e.g. AuthError from supabase-swift)
+                    let isCredentialError = errorMsg.contains("invalid login credentials") ||
+                        errorMsg.contains("invalid_grant") || nsError.code == 401
+                    errorMessage = !isSignUp && isCredentialError
+                        ? "電子郵件或密碼不正確。\n\n若尚未註冊，請先註冊；若忘記密碼，請使用「忘記密碼？」。"
+                        : "發生錯誤。\n\n\(error.localizedDescription)\n\n請稍後再試，如問題持續存在，請聯繫客服。"
                     showError = true
                 }
                 

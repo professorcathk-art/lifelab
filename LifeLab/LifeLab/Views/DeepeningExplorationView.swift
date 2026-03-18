@@ -202,7 +202,22 @@ struct DeepeningExplorationView: View {
                             Text(isGeneratingActionPlan ? "行動計劃生成中" : (dataService.userProfile?.actionPlan != nil ? "行動計劃已生成" : "生成行動計劃"))
                         }
                         
-                        if !isGeneratingActionPlan && dataService.userProfile?.actionPlan == nil {
+                        if isGeneratingActionPlan {
+                            // Warning banner when generating
+                            HStack(spacing: BrandSpacing.sm) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(BrandColors.warning)
+                                Text("請勿離開此頁面，以免生成中斷")
+                                    .font(BrandTypography.caption)
+                                    .foregroundColor(BrandColors.warning)
+                            }
+                            .padding(.horizontal, BrandSpacing.sm)
+                            .padding(.vertical, BrandSpacing.xs)
+                            .background(BrandColors.warning.opacity(0.1))
+                            .cornerRadius(BrandRadius.small)
+                            .padding(.top, BrandSpacing.xs)
+                        } else if !isGeneratingActionPlan && dataService.userProfile?.actionPlan == nil {
                             Text("請先在編輯頁面選擇一個方向設為當前行動方向（⭐）")
                                 .font(BrandTypography.caption)
                                 .foregroundColor(BrandColors.invertedText.opacity(0.9))

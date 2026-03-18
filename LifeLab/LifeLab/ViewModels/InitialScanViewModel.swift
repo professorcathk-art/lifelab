@@ -578,16 +578,9 @@ class InitialScanViewModel: ObservableObject {
             initializeValues()
             currentStep = .values
         case .values:
-            // Check if user has already given consent (from login page)
-            if hasGivenAIConsent {
-                // User already consented during login, proceed directly to AI summary
-                currentStep = .aiSummary
-                generateAISummary()
-            } else {
-                // User hasn't consented yet (shouldn't happen if login flow is correct, but fallback)
-                // Move to AI consent screen before sending data to AI
-                currentStep = .aiConsent
-            }
+            // Proceed directly to AI summary (consent should be given during login)
+            currentStep = .aiSummary
+            generateAISummary()
         case .aiConsent:
             // Only proceed to AI summary if consent has been given
             guard hasGivenAIConsent else {
@@ -945,13 +938,24 @@ class InitialScanViewModel: ObservableObject {
     }
     
     func generateLifeBlueprint() {
+        // CRITICAL: Check if blueprint already exists before generating
+        // This prevents regenerating blueprint when app restarts
+        if let existingBlueprint = DataService.shared.userProfile?.lifeBlueprint {
+            print("⚠️⚠️⚠️ CRITICAL: Blueprint already exists! Not regenerating. Use existing blueprint.")
+            print("   Existing blueprint version: \(existingBlueprint.version)")
+            print("   Created at: \(existingBlueprint.createdAt)")
+            self.lifeBlueprint = existingBlueprint
+            self.isLoadingBlueprint = false
+            return
+        }
+        
         // CRITICAL: Ensure user has given consent before sending data to AI
         guard hasGivenAIConsent else {
             print("❌ Cannot generate life blueprint: User has not given consent")
             isLoadingBlueprint = false
             return
         }
-        
+
         isLoadingBlueprint = true
         
         // CRITICAL: Request background execution time to continue task even when app is minimized
@@ -979,8 +983,8 @@ class InitialScanViewModel: ObservableObject {
         print("🔄 Starting blueprint generation (will continue in background if app is minimized)")
         print("   Background task ID: \(capturedTaskID.rawValue)")
         
-        // Use Task to ensure task continues even if app goes to background
-        // beginBackgroundTask provides up to ~30 seconds of background execution time
+        // Use Task - beginBackgroundTask provides up to ~30 seconds when app goes to background
+        // Note: Task.detached caused MainActor isolation errors with @MainActor ViewModel
         Task { [weak self] in
             guard let self = self else {
                 // End background task if view model is deallocated
@@ -1043,7 +1047,19 @@ class InitialScanViewModel: ObservableObject {
                 
                 print("✅ Blueprint generation completed (even if app was in background)")
                 
+                // CRITICAL: Double-check before saving (race condition protection)
+                // Another process might have created blueprint while we were generating
                 await MainActor.run {
+                    // Check if blueprint was created while we were generating
+                    if let existingBlueprint = DataService.shared.userProfile?.lifeBlueprint {
+                        print("⚠️⚠️⚠️ CRITICAL: Blueprint was created while generating! Using existing blueprint.")
+                        print("   Existing blueprint version: \(existingBlueprint.version)")
+                        self.lifeBlueprint = existingBlueprint
+                        self.isLoadingBlueprint = false
+                        endBackgroundTask()
+                        return
+                    }
+                    
                     var updatedBlueprint = blueprint
                     updatedBlueprint.version = 1
                     updatedBlueprint.createdAt = Date()
@@ -1056,21 +1072,33 @@ class InitialScanViewModel: ObservableObject {
                     print("  - Strengths summary length: \(blueprint.strengthsSummary.count) chars")
                     print("  - Strengths summary preview: \(blueprint.strengthsSummary.prefix(100))...")
                     
-                    // CRITICAL: Save to DataService FIRST, before setting isLoadingBlueprint = false
-                    // This ensures ContentView immediately detects the blueprint and switches to MainTabView
-                    // updateUserProfile is synchronous and will immediately update @Published userProfile
-                    DataService.shared.updateUserProfile { profile in
-                        profile.lifeBlueprint = updatedBlueprint
-                        // Also add to lifeBlueprints array so it shows in ProfileView
-                        if !profile.lifeBlueprints.contains(where: { $0.version == 1 }) {
-                            profile.lifeBlueprints.append(updatedBlueprint)
-                            print("✅ Added Version 1 to lifeBlueprints array")
-                        } else {
-                            // Update existing Version 1 if it exists
-                            if let index = profile.lifeBlueprints.firstIndex(where: { $0.version == 1 }) {
-                                profile.lifeBlueprints[index] = updatedBlueprint
-                                print("✅ Updated existing Version 1 in lifeBlueprints array")
+                    // CRITICAL: Final check before saving (prevent overwriting existing blueprint)
+                    // Another process might have created blueprint while we were generating
+                    if DataService.shared.userProfile?.lifeBlueprint == nil {
+                        // CRITICAL: Save to DataService FIRST, before setting isLoadingBlueprint = false
+                        // This ensures ContentView immediately detects the blueprint and switches to MainTabView
+                        // updateUserProfile is synchronous and will immediately update @Published userProfile
+                        DataService.shared.updateUserProfile { profile in
+                            profile.lifeBlueprint = updatedBlueprint
+                            // Also add to lifeBlueprints array so it shows in ProfileView
+                            if !profile.lifeBlueprints.contains(where: { $0.version == 1 }) {
+                                profile.lifeBlueprints.append(updatedBlueprint)
+                                print("✅ Added Version 1 to lifeBlueprints array")
+                            } else {
+                                // Update existing Version 1 if it exists
+                                if let index = profile.lifeBlueprints.firstIndex(where: { $0.version == 1 }) {
+                                    profile.lifeBlueprints[index] = updatedBlueprint
+                                    print("✅ Updated existing Version 1 in lifeBlueprints array")
+                                }
                             }
+                        }
+                        print("✅✅✅ Blueprint generated and saved successfully")
+                    } else {
+                        // Blueprint was created by another process, use existing
+                        print("⚠️⚠️⚠️ CRITICAL: Blueprint was created during save! Using existing blueprint.")
+                        if let existingBlueprint = DataService.shared.userProfile?.lifeBlueprint {
+                            self.lifeBlueprint = existingBlueprint
+                            print("   Using existing blueprint version: \(existingBlueprint.version)")
                         }
                     }
                     

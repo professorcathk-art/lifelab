@@ -80,6 +80,23 @@ struct BlueprintGenerationProgressView: View {
                         .multilineTextAlignment(.center)
                         .animation(.easeInOut(duration: 0.5), value: currentStepIndex)
                         .frame(height: 40) // Fixed height to prevent layout shift
+                    
+                    // Warning banner - only show when actively generating
+                    if viewModel.isLoadingBlueprint {
+                        HStack(spacing: BrandSpacing.sm) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 14))
+                                .foregroundColor(BrandColors.warning)
+                            Text("請勿離開此頁面，以免生成中斷")
+                                .font(BrandTypography.caption)
+                                .foregroundColor(BrandColors.warning)
+                        }
+                        .padding(.horizontal, BrandSpacing.md)
+                        .padding(.vertical, BrandSpacing.sm)
+                        .background(BrandColors.warning.opacity(0.1))
+                        .cornerRadius(BrandRadius.small)
+                        .transition(.opacity.combined(with: .scale))
+                    }
                 }
                 .padding(.horizontal, BrandSpacing.xxxl)
                 

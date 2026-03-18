@@ -93,16 +93,16 @@ class DataService: ObservableObject {
     }
     
     /// Load from Supabase (background, non-blocking)
+    /// LOCAL-FIRST: Always load from device storage first, then merge with Supabase
     func loadFromSupabase(userId: String) async {
         print("📥 DataService.loadFromSupabase called for user: \(userId)")
         
-        // IMPORTANT: Load user-specific data from local storage first
-        // This ensures data isolation between different users
-        
-        // Load user-specific local data (if exists)
-        loadUserProfileForUser(userId: userId)
+        // CRITICAL: Load local data FIRST on main thread - ensures UI has data immediately
+        await MainActor.run {
+            loadUserProfileForUser(userId: userId)
+        }
         if let localProfile = userProfile {
-            print("📱 Loaded local profile: \(localProfile.interests.count) interests, \(localProfile.strengths.count) strengths")
+            print("📱 Loaded local profile: \(localProfile.interests.count) interests, \(localProfile.strengths.count) strengths, blueprint: \(localProfile.lifeBlueprint != nil ? "YES" : "NO")")
         } else {
             print("📱 No local profile found")
         }
@@ -115,11 +115,15 @@ class DataService: ObservableObject {
         print("🌐 Online: Fetching profile from Supabase...")
         do {
             if let profile = try await supabaseService.fetchUserProfile(userId: userId) {
-                print("✅ Successfully fetched profile from Supabase: \(profile.interests.count) interests, \(profile.strengths.count) strengths")
+                print("✅ Successfully fetched profile from Supabase: \(profile.interests.count) interests, \(profile.strengths.count) strengths, \(profile.values.count) values")
+                print("   🔍 Has lifeBlueprint: \(profile.lifeBlueprint != nil ? "YES ✅" : "NO ❌")")
+                if let blueprint = profile.lifeBlueprint {
+                    print("   📋 Blueprint version: \(blueprint.version), created at: \(blueprint.createdAt)")
+                }
                 await MainActor.run {
-                    // Merge strategy: Keep local data if it exists, merge with Supabase
+                    // LOCAL-FIRST: Never overwrite local data with incomplete Supabase data
                     if let localProfile = self.userProfile {
-                        // Local data exists - merge intelligently
+                        // Local data exists - merge intelligently, ALWAYS preserve local critical data
                         if localProfile.updatedAt > profile.updatedAt {
                             // Local is newer, keep local but sync to Supabase
                             print("📱 Local data is newer, keeping local version")
@@ -127,12 +131,22 @@ class DataService: ObservableObject {
                                 await self.syncToSupabase(profile: localProfile)
                             }
                         } else {
-                            // Supabase is newer, merge with local (preserve local changes)
+                            // Supabase is newer - but CRITICAL: preserve local lifeBlueprint/actionPlan if Supabase lacks them
+                            // (Supabase may lack these if column was missing or sync failed)
                             var mergedProfile = profile
-                            // Preserve local changes that might not be in Supabase
                             mergedProfile.interests = localProfile.interests.isEmpty ? profile.interests : localProfile.interests
                             mergedProfile.strengths = localProfile.strengths.isEmpty ? profile.strengths : localProfile.strengths
                             mergedProfile.values = localProfile.values.isEmpty ? profile.values : localProfile.values
+                            // CRITICAL: Never lose local blueprint - Supabase may not have it (column missing, sync failed)
+                            if profile.lifeBlueprint == nil && localProfile.lifeBlueprint != nil {
+                                mergedProfile.lifeBlueprint = localProfile.lifeBlueprint
+                                mergedProfile.lifeBlueprints = localProfile.lifeBlueprints.isEmpty ? [] : localProfile.lifeBlueprints
+                                print("📱 Preserved local lifeBlueprint (Supabase lacks it - sync may have failed)")
+                            }
+                            if profile.actionPlan == nil && localProfile.actionPlan != nil {
+                                mergedProfile.actionPlan = localProfile.actionPlan
+                                print("📱 Preserved local actionPlan (Supabase lacks it)")
+                            }
                             
                             self.userProfile = mergedProfile
                             self.saveToUserDefaults(mergedProfile)
@@ -281,8 +295,10 @@ class DataService: ObservableObject {
                 print("   Error details: \(error)")
                 print("   Error code: \(error.code)")
                 print("   Error domain: \(error.domain)")
-                print("   💾 Data saved locally but NOT synced to Supabase")
-                print("   ⚠️ This might be a server error, not a network error")
+                print("   💾 Data saved locally - your data is SAFE on this device")
+                if (error.localizedDescription.contains("life_blueprint") || error.localizedDescription.contains("column")) {
+                    print("   ⚠️ SCHEMA ERROR: Run SUPABASE_ADD_LIFE_BLUEPRINT_COLUMN.sql in Supabase Dashboard → SQL Editor")
+                }
             }
             // Continue using local data (offline support)
         } catch {
@@ -410,8 +426,7 @@ class DataService: ObservableObject {
         if let data = UserDefaults.standard.data(forKey: userKey) {
             print("   ✅ Found data in UserDefaults (\(data.count) bytes)")
             if let profile = try? JSONDecoder().decode(UserProfile.self, from: data) {
-                // CRITICAL: Double-check that the profile belongs to the correct user
-                // This is an extra safety check
+                // CRITICAL: Update on main thread for SwiftUI @Published
                 userProfile = profile
                 
                 // Load sync time
